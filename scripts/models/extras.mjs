@@ -188,3 +188,47 @@ export function surfer(){
  const skeg=fin('BoardFin',0x2c3e4a,{span:.16,chord:.14,sweep:.12,thickness:.02,down:true});skeg.position.set(0,-.2,1);model.add(skeg);
  return model;
 }
+
+// Recolour a lathe body by a function of (side-to-side angle sine, length position).
+function paint(body,pick){
+ const position=body.geometry.attributes.position,color=body.geometry.attributes.color,shade=new THREE.Color();
+ for(let i=0;i<position.count;i++){shade.set(pick(position.getX(i),position.getY(i),position.getZ(i)));color.setXYZ(i,shade.r,shade.g,shade.b);}
+ return body;
+}
+
+export function orca(){
+ const model=group('Orca'),black=0x15181c,white=0xe9ebe6;
+ const profile=[[-3.25,.012,.012],[-3.2,.08,.08],[-2.95,.3,.28],[-2.4,.6,.6],[-1.2,.8,.85],[.2,.78,.82],[1.6,.5,.52],[2.6,.2,.24],[3.1,.1,.12]];
+ // White belly and chin, the oval patch behind each eye, and a grey saddle behind the fin.
+ model.add(paint(latheBody(profile,black,'DolphinBodyOrca',96,48),(x,y,z)=>{
+  if(y<-.28-Math.max(0,z-1.2)*.12&&z<2.4)return white;
+  if(Math.hypot((z+2.25)/.42,(y-.22)/.15)<1&&Math.abs(x)>.3)return white;
+  if(y>.45&&z>.5&&z<1.5)return 0x565b63;
+  return black;
+ }));
+ const dorsal=fin('DolphinFinOrcaDorsal',black,{span:1.5,chord:.85,sweep:.55,thickness:.1,taper:1.2});dorsal.position.set(0,.74,-.5);model.add(dorsal);
+ const tail=group('TailV');tail.position.z=2.95;model.add(tail);
+ for(const side of [-1,1]){
+  const fluke=fin('DolphinFinOrcaFluke',black,{span:1.25,chord:.85,sweep:.65,thickness:.09,taper:1.2});fluke.rotation.z=-side*Math.PI/2;tail.add(fluke);
+  const paddle=fin('DolphinFinOrcaPaddle',black,{span:.9,chord:.6,sweep:.4,thickness:.09,taper:1.1});paddle.rotation.z=-side*(Math.PI/2+.6);paddle.position.set(side*.6,-.4,-1.5);model.add(paddle);
+  model.add(oval([.03,.045,.05],0x040506,'OrcaEye',[side*.56,.1,-2.55]));
+ }
+ return model;
+}
+
+export function whale(){
+ const model=group('Whale'),hide=0x2f3a44,pale=0xb9bfbd;
+ const profile=[[-7.08,.012,.012],[-7,.16,.16],[-6.5,.7,.6],[-5.2,1.25,1.2],[-3,1.6,1.7],[0,1.55,1.65],[3,1.05,1.1],[5.2,.45,.5],[6.6,.2,.22]];
+ // Dark back, pale throat and belly.
+ model.add(paint(latheBody(profile,hide,'DolphinBodyWhale',96,48),(x,y,z)=>y<-.6-Math.max(0,z-1)*.1?pale:hide));
+ const dorsal=fin('DolphinFinWhaleDorsal',hide,{span:.5,chord:.9,sweep:.7,thickness:.12});dorsal.position.set(0,1.05,2.6);model.add(dorsal);
+ const tail=group('TailV');tail.position.z=6.4;model.add(tail);
+ for(const side of [-1,1]){
+  const fluke=fin('DolphinFinWhaleFluke',hide,{span:3.1,chord:1.9,sweep:1.5,thickness:.18,taper:1.2});fluke.rotation.z=-side*Math.PI/2;tail.add(fluke);
+  // Humpback flippers are a third of the body length.
+  const arm=fin('DolphinFinWhaleFlipper',0x3a4650,{span:3.6,chord:1.25,sweep:1.2,thickness:.2,taper:.8});arm.rotation.z=-side*(Math.PI/2+.5);arm.position.set(side*1.3,-.8,-3.2);model.add(arm);
+  model.add(oval([.05,.07,.08],0x050607,'WhaleEye',[side*1.22,-.15,-4.9]));
+ }
+ for(let i=0;i<6;i++)model.add(oval([.09,.06,.09],0x46525c,'WhaleKnob',[(i%2?-.25:.25),.72-i*.04,-6.2+i*.22]));
+ return model;
+}

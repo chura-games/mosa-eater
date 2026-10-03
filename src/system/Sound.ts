@@ -5,7 +5,7 @@ export class Sound{
  private master!:GainNode;private muffle!:BiquadFilterNode;private bus!:GainNode;
  private noise!:AudioBuffer;
  private sea!:GainNode;private deep!:GainNode;private rush!:GainNode;private rushTone!:BiquadFilterNode;private dread!:GainNode;
- private level=.7;private muted=false;private nextGull=0;
+ private level=.7;private muted=false;private nextGull=0;private nextScream=0;
  get enabled(){return !this.muted;}
  get volume(){return this.level;}
  // Browsers only allow audio after a key press or click, so this is called from one.
@@ -49,6 +49,8 @@ export class Sound{
   this.rush.gain.setTargetAtTime(Math.min(.34,speed*.014),now,.12);this.rushTone.frequency.setTargetAtTime(300+speed*38,now,.12);
   this.dread.gain.setTargetAtTime(Math.min(.2,panic*.0024),now,.8);
   if(submerged<.5&&now>this.nextGull){this.nextGull=now+4+Math.random()*9;this.gull();}
+  // A frightened coast: screams carry from the beach for as long as the panic lasts.
+  if(panic>25&&now>this.nextScream){this.nextScream=now+(panic>60?1.2:2.6)+Math.random()*3;this.scream(.1+Math.random()*.14);}
  }
  private burst(duration:number,type:BiquadFilterType,from:number,to:number,q:number,volume:number,delay=0,attack=.004){
   const context=this.context!,start=context.currentTime+delay;
@@ -76,15 +78,44 @@ export class Sound{
  // One wet rip, for each shake of a body in the jaws.
  tear(){if(!this.context)return;this.burst(.24,'bandpass',1500+Math.random()*500,300,2.6,.42,0,.02);this.burst(.06,'bandpass',1400+Math.random()*900,500,7,.34,.05);this.tone('sine',70,40,.16,.3);}
  gulp(){if(!this.context)return;this.tone('sine',210,70,.2,.4);this.burst(.2,'lowpass',420,110,3,.45,.04);this.tone('sine',120,52,.18,.3,.17);}
- // A short cry, cut off. Underwater it comes through as a muffled burble.
- scream(){
+ // A human voice: a sawtooth through two vowel formants, with the wobble of a strained throat.
+ // The pitch contour is a list of [time, frequency]; hold is how long it stays at full volume.
+ private voice(contour:[number,number][],hold:number,volume:number,delay=0){
+  const context=this.context!,start=context.currentTime+delay,end=start+hold+.12;
+  const cords=context.createOscillator(),gain=context.createGain(),shake=context.createOscillator(),depth=context.createGain();
+  cords.type='sawtooth';cords.frequency.setValueAtTime(contour[0][1],start);
+  for(const [time,frequency] of contour.slice(1))cords.frequency.linearRampToValueAtTime(frequency,start+time);
+  // A fast, uneven tremble is what separates a scream from a sung note.
+  shake.frequency.value=9+Math.random()*5;depth.gain.value=contour[0][1]*.045;shake.connect(depth).connect(cords.frequency);
+  gain.gain.setValueAtTime(.0001,start);gain.gain.linearRampToValueAtTime(volume,start+.035);gain.gain.setValueAtTime(volume,start+hold);gain.gain.linearRampToValueAtTime(.0001,end);
+  for(const [frequency,q,level] of [[1050,3,1],[2700,5,.55],[3600,6,.25]]){
+   const formant=context.createBiquadFilter(),mix=context.createGain();formant.type='bandpass';formant.frequency.value=frequency*(.92+Math.random()*.16);formant.Q.value=q;mix.gain.value=level;
+   cords.connect(formant).connect(mix).connect(gain);
+  }
+  gain.connect(this.bus);cords.start(start);shake.start(start);cords.stop(end+.05);shake.stop(end+.05);
+  // Breath noise riding on the voice.
+  this.burst(hold+.1,'bandpass',1800,2600,1.2,volume*.35,delay,.04);
+ }
+ // Someone has seen it. Men and women differ in pitch; no two cries are quite alike.
+ scream(volume=1){
   if(!this.context)return;
-  const context=this.context,start=context.currentTime,voice=context.createOscillator(),formant=context.createBiquadFilter(),gain=context.createGain();
-  voice.type='sawtooth';voice.frequency.setValueAtTime(420+Math.random()*120,start);voice.frequency.linearRampToValueAtTime(820+Math.random()*200,start+.12);voice.frequency.linearRampToValueAtTime(520,start+.34);
-  formant.type='bandpass';formant.frequency.value=1250;formant.Q.value=2.2;
-  gain.gain.setValueAtTime(.0001,start);gain.gain.linearRampToValueAtTime(.2,start+.03);gain.gain.setValueAtTime(.2,start+.26);gain.gain.linearRampToValueAtTime(.0001,start+.36);
-  voice.connect(formant).connect(gain).connect(this.bus);voice.start(start);voice.stop(start+.4);
-  this.burst(.45,'bandpass',900,2200,1.5,.14,.05,.05);
+  const base=(Math.random()<.5?330:560)*(.85+Math.random()*.3),length=.45+Math.random()*.55;
+  this.voice([[0,base*.8],[.09,base*1.45],[length*.6,base*1.6],[length,base*1.15]],length,.26*volume);
+ }
+ // Caught: the scream climbs, breaks, and drowns in bubbles.
+ deathScream(){
+  if(!this.context)return;
+  const base=(Math.random()<.5?350:590)*(.9+Math.random()*.2);
+  this.voice([[0,base],[.08,base*1.7],[.3,base*1.95],[.42,base*1.2]],.4,.34);
+  for(let i=0;i<7;i++)this.burst(.07,'bandpass',300+Math.random()*500,180,5,.3,.43+i*.06+Math.random()*.03,.01);
+  this.burst(.6,'lowpass',420,120,1.4,.32,.42,.05);
+ }
+ // Animals cry out when bitten.
+ cry(kind:string){
+  if(!this.context)return;
+  if(kind==='dolphin'||kind==='orca'){const pitch=kind==='orca'?1700:3200;for(let i=0;i<3;i++)this.tone('sine',pitch*(1+i*.12),pitch*(1.9+Math.random()*.4),.13,.16,i*.11,.01);}
+  else if(kind==='whale'){this.tone('sine',150,82,1.6,.5,0,.15);this.tone('triangle',226,120,1.5,.2,.05,.2);this.burst(1.2,'bandpass',220,120,2,.2,.1,.2);}
+  else if(kind==='seal'||kind==='sealion')for(let i=0;i<3;i++){this.tone('sawtooth',300+Math.random()*60,210,.13,.14,i*.17,.01);this.burst(.12,'bandpass',750,520,3,.16,i*.17,.01);}
  }
  // A hull giving way: a deep impact, splintering, and ringing metal for steel boats.
  smash(size=1,metal=false){

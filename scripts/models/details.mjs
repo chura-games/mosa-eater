@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 
 export function optimize(root,hitboxes=false){
  root.updateMatrixWorld(true);
@@ -19,7 +19,9 @@ export function optimize(root,hitboxes=false){
   for(const parts of buckets.values()){
    if(parts.length<2)continue;
    const geometries=parts.map(part=>{part.updateMatrix();const geometry=part.geometry.clone().applyMatrix4(part.matrix);return geometry.index?geometry.toNonIndexed():geometry;});
-   const merged=mergeGeometries(geometries,false);if(!merged)throw new Error('Cannot batch '+parent.name);
+   // Weld shared corners again after merging: smaller files and fewer vertices for the GPU.
+   const joined=mergeGeometries(geometries,false);if(!joined)throw new Error('Cannot batch '+parent.name);
+   const merged=mergeVertices(joined,1e-4);
    const model=new THREE.Mesh(merged,parts[0].material);model.name=parts[0].name+'Assembly';model.userData.parts=parts.map(part=>part.name);model.userData.noCollision=parts[0].userData.noCollision??false;
    parts.forEach(part=>parent.remove(part));parent.add(model);
   }
@@ -43,16 +45,16 @@ export function rod(a,b,radius,color,name,segments=10){
  const result=mesh(new THREE.CylinderGeometry(radius,radius,delta.length(),segments),color,name,from.clone().add(to).multiplyScalar(.5).toArray(),.45,.2);
  result.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());return result;
 }
-export function tube(points,radius,color,name){return mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p))),24,radius,6,false),color,name);}
+export function tube(points,radius,color,name,segments=24,radial=6){return mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p))),segments,radius,radial,false),color,name);}
 export function group(name){const result=new THREE.Group();result.name=name;return result;}
 export function foil(points,thickness,color,name){
  const shape=new THREE.Shape();shape.moveTo(...points[0]);for(const point of points.slice(1))shape.lineTo(...point);shape.closePath();
  const geometry=new THREE.ExtrudeGeometry(shape,{depth:thickness,bevelEnabled:true,bevelSize:thickness*.3,bevelThickness:thickness*.25,bevelSegments:2,steps:1});
  geometry.translate(0,0,-thickness*.5);return mesh(geometry,color,name);
 }
-export function latheBody(profile,color,name){
- const points=profile.map(([z,width,height])=>new THREE.Vector3(z,width,height)),around=32;
- const sections=new THREE.CatmullRomCurve3(points).getPoints(64),vertices=[],indices=[],colors=[];
+export function latheBody(profile,color,name,rings=64,around=32){
+ const points=profile.map(([z,width,height])=>new THREE.Vector3(z,width,height));
+ const sections=new THREE.CatmullRomCurve3(points).getPoints(rings),vertices=[],indices=[],colors=[];
  for(const p of sections)for(let j=0;j<=around;j++){
   const angle=j/around*Math.PI*2,vertical=Math.sin(angle);
   vertices.push(Math.max(.015,p.y)*Math.cos(angle),Math.max(.015,p.z)*vertical,p.x);
@@ -64,8 +66,8 @@ export function latheBody(profile,color,name){
  const result=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4}));result.name=name;return result;
 }
 // A rounded hydrofoil: span along +Y, leading edge toward -Z, tapering to a swept tip.
-export function fin(name,color,{span,chord,sweep,thickness=.1,taper=1.5,down=false}){
- const rings=16,segments=14,vertices=[],colors=[],indices=[],base=new THREE.Color(color),edge=base.clone().multiplyScalar(.7);
+export function fin(name,color,{span,chord,sweep,thickness=.1,taper=1.5,down=false,rings=16,segments=14}){
+ const vertices=[],colors=[],indices=[],base=new THREE.Color(color),edge=base.clone().multiplyScalar(.7);
  for(let i=0;i<=rings;i++){
   const t=i/rings,c=Math.max(.02,chord*Math.pow(1-t,taper)),leading=sweep*Math.pow(t,.8),half=Math.max(.006,thickness*.5*Math.pow(1-t,.9));
   for(let j=0;j<segments;j++){

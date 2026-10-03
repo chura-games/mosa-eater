@@ -162,28 +162,28 @@ await save('objects/diver',detailed(details.diver(),true));
 await save('objects/shark',detailed(details.shark(),true));
 await save('objects/boat',detailed(details.boat(),true));
 await save('objects/patrol',detailed(details.boat(true),true));
-for(const name of ['fish','dolphin','turtle','swimmer','jetski','sailboat','buoy','ray','seal','jellyfish','kayak','surfer'])await save('objects/'+name,detailed(extras[name](),true));
+for(const name of ['fish','dolphin','turtle','swimmer','jetski','sailboat','buoy','ray','seal','jellyfish','kayak','surfer','orca','whale'])await save('objects/'+name,detailed(extras[name](),true));
 await save('objects/gull',detailed(extras.gull()));
 await save('maps/coast',terrain());
 
 const layout={map:'coast',objects:[]};
 function place(asset,x,z,scale=[1,1,1],rotation=0,offset=0){layout.objects.push({asset,position:[x,groundHeight(x,z)+offset,z],scale,rotation:[0,rotation,0]});}
 await save('objects/rock',details.rock());
-for(let i=0;i<28;i++){
- const side=i%2?1:-1,x=side*random(54,86),z=shoreZ(x)+random(-5,18),size=random(1.4,4.2);
+for(let i=0;i<44;i++){
+ const side=i%2?1:-1,x=side*(i<28?random(54,86):random(150,205)),z=shoreZ(x)+random(-5,18),size=random(1.4,4.2);
  place('rock',x,z,[size,random(1.8,4.4),size*.85],random(0,6.28),-.3);
 }
-for(let i=0;i<14;i++){const x=random(-66,66),z=random(6,70);if(Math.hypot(x,z-12)>15)place('rock',x,z,[random(.8,2.7),random(.5,1.5),random(1,3)],random(0,6.28),-.3);}
+for(let i=0;i<30;i++){const x=random(-185,185),z=random(6,200);if(Math.hypot(x,z-12)>15)place('rock',x,z,[random(.8,2.7),random(.5,1.5),random(1,3)],random(0,6.28),-.3);}
 await save('objects/palm',detailed(details.palm()));
-for(let i=0;i<18;i++){
- const x=-68+i*8+random(-2,2),z=shoreZ(x)-random(15,27),size=random(.83,1.25);
+for(let i=0;i<34;i++){
+ const x=-190+i*11.5+random(-3,3),z=shoreZ(x)-random(15,27),size=random(.83,1.25);
  place('palm',x,z,[size,size,size],random(-Math.PI,Math.PI));
 }
 await save('objects/umbrella',detailed(details.umbrella()));
 await save('objects/umbrella-orange',detailed(details.umbrella(true)));
 await save('objects/lounger',detailed(details.lounger()));
-for(let i=0;i<8;i++){
- const x=-48+i*13+random(-1.2,1.2),z=shoreZ(x)-9-(i%2)*4;
+for(let i=0;i<16;i++){
+ const x=-120+i*16+random(-2,2),z=shoreZ(x)-9-(i%2)*4;
  if(Math.abs(x+34)<5)continue;
  place(i%2?'umbrellaOrange':'umbrella',x,z,[1,1,1],random(-.25,.25));
  for(const side of [-1,1]){
@@ -193,30 +193,31 @@ for(let i=0;i<8;i++){
 }
 await save('objects/platform',detailed(details.platform()));
 layout.objects.push({asset:'platform',position:[64,0,59],scale:[.65,.8,.65]});
+layout.objects.push({asset:'platform',position:[-120,0,140],scale:[.65,.8,.65],rotation:[0,1.1,0]});
 await save('objects/pier',detailed(scenery.pier()));
 layout.objects.push({asset:'pier',position:[-34,0,shoreZ(-34)+8]});
 await save('objects/beach-bar',detailed(scenery.beachBar()));
 place('beachBar',13,shoreZ(13)-22,[1,1,1],-.05);
 await save('objects/grass',detailed(scenery.grass()));
-for(let i=0;i<125;i++){
- const x=random(-100,100),z=shoreZ(x)-random(19,50);
+for(let i=0;i<190;i++){
+ const x=random(-200,200),z=shoreZ(x)-random(19,50);
  if(Math.hypot(x-13,z-(shoreZ(13)-22))<8)continue;
  const size=random(.7,1.6);place('grass',x,z,[size,size,size],random(0,6.28));
 }
 await save('objects/coral',detailed(scenery.coral()));
-for(let i=0;i<24;i++){
- const side=i%2?1:-1,x=side*random(22,65),z=random(-8,58),size=random(.7,1.5);
+for(let i=0;i<46;i++){
+ const side=i%2?1:-1,x=side*random(18,190),z=random(-8,170),size=random(.7,1.5);
  place('coral',x,z,[size,size,size],random(0,6.28));
 }
 await save('objects/kelp',detailed(extras.kelp()));
-for(let i=0;i<34;i++){
- const x=random(-74,74),z=shoreZ(x)+random(18,70),size=random(.8,1.5);
- if(Math.hypot(x-64,z-59)<14)continue;
+for(let i=0;i<64;i++){
+ const x=random(-195,195),z=shoreZ(x)+random(18,200),size=random(.8,1.5);
+ if(Math.hypot(x-64,z-59)<14||Math.hypot(x+120,z-140)<14)continue;
  place('kelp',x,z,[size,size*random(.8,1.3),size],random(0,6.28));
 }
 await writeFile(new URL('../src/assets/maps/coast.layout.json',import.meta.url),JSON.stringify(layout,null,2)+'\n');
 const bubblesGeo=new THREE.BufferGeometry();const coords=new Float32Array(450*3);
-for(let i=0;i<coords.length;i+=3){coords[i]=random(-78,78);coords[i+1]=random(-28,-1);coords[i+2]=random(-22,76);}
+for(let i=0;i<coords.length;i+=3){coords[i]=random(-45,45);coords[i+1]=random(-28,-1);coords[i+2]=random(-45,45);}
 bubblesGeo.setAttribute('position',new THREE.BufferAttribute(coords,3));
 const bubbles=new THREE.Points(bubblesGeo,new THREE.MeshBasicMaterial({color:0xbce9d5,transparent:true,opacity:.5}));
 bubbles.name='Bubbles';bubbles.userData.pointSize=.12;

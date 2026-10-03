@@ -5,7 +5,7 @@ import {random} from '../utils/random';
 export class Gull{
  mesh=new THREE.Group();
  private readonly wings:THREE.Object3D[];
- private readonly center=new THREE.Vector3(random(-60,60),0,random(-45,20));
+ private readonly center=new THREE.Vector3(random(-150,150),0,random(-45,40));
  private readonly radius=random(9,26);
  private readonly height=random(9,20);
  private readonly rate=random(.18,.34)*(Math.random()<.5?-1:1);

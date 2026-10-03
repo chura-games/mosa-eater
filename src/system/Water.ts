@@ -12,7 +12,7 @@ export function createWater(water:THREE.Mesh){
  // Rings spreading from where something broke the surface: x, z, start time, strength.
  const ripples=Array.from({length:8},()=>new THREE.Vector4(0,0,-100,0));
  let nextRipple=0;
- const uniforms={uTime:{value:0},uUnderwater:{value:0},uPredator:{value:new THREE.Vector4()},uForward:{value:new THREE.Vector2(0,-1)},uBoats:{value:boats},uCoast:{value:new THREE.Vector4(profile.shoreZ,profile.curveAmplitude,profile.curveFrequency,profile.seaSlope)},uBeach:{value:new THREE.Vector2(profile.beachSlope,profile.floorDepth)},uRipples:{value:ripples}};
+ const uniforms={uTime:{value:0},uUnderwater:{value:0},uPredator:{value:new THREE.Vector4()},uForward:{value:new THREE.Vector2(0,-1)},uBoats:{value:boats},uCoast:{value:new THREE.Vector4(profile.shoreZ,profile.curveAmplitude,profile.curveFrequency,profile.seaSlope)},uBeach:{value:new THREE.Vector2(profile.beachSlope,profile.floorDepth)},uRipples:{value:ripples},uMirror:{value:1}};
  // Water's mirror camera expects a local XY plane. The source GLB remains an XZ surface.
  const geometry=water.geometry.clone();geometry.rotateX(Math.PI/2);
  const reflective=new Water(geometry,{textureWidth:768,textureHeight:768,clipBias:.02,side:THREE.DoubleSide});
@@ -21,6 +21,15 @@ export function createWater(water:THREE.Mesh){
  material.vertexShader=vertexShader;material.fragmentShader=fragmentShader;
  Object.assign(material.uniforms,uniforms);material.lights=false;material.transparent=true;material.depthWrite=false;
  water.parent!.add(reflective);water.removeFromParent();
+ // The mirror pass draws the whole scene again. Skip it when it cannot be seen (camera under
+ // water), every other frame on medium quality, and entirely on low.
+ let mirrorMode:'off'|'half'|'full'='full',mirrorFrame=0;
+ const renderMirror=reflective.onBeforeRender;
+ reflective.onBeforeRender=function(...parameters){
+  if(mirrorMode==='off'||uniforms.uUnderwater.value>.98)return;
+  if(mirrorMode==='half'&&mirrorFrame++%2)return;
+  renderMirror.apply(this,parameters);
+ };
  // Geometry stays in the map asset; waves and their normals are computed on the GPU.
  geometry.computeBoundingBox();geometry.boundingBox!.expandByScalar(1);
  geometry.computeBoundingSphere();geometry.boundingSphere!.radius+=1;
@@ -32,5 +41,5 @@ export function createWater(water:THREE.Mesh){
   const active=ships.filter(ship=>ship.ship&&ship.alive).sort((a,b)=>(b.speed??0)-(a.speed??0)).slice(0,10);
   boats.forEach((boat,i)=>{const ship=active[i];if(ship)boat.set(ship.mesh.position.x,ship.mesh.position.z,ship.heading,Math.min(.65,(ship.speed??5)*.13));else boat.w=0;});
  };
- return Object.assign(update,{ripple(x:number,z:number,strength=1){ripples[nextRipple++%ripples.length].set(x,z,uniforms.uTime.value,strength);}});
+ return Object.assign(update,{setMirror(mode:'off'|'half'|'full'){mirrorMode=mode;uniforms.uMirror.value=mode==='off'?0:1;},ripple(x:number,z:number,strength=1){ripples[nextRipple++%ripples.length].set(x,z,uniforms.uTime.value,strength);}});
 }

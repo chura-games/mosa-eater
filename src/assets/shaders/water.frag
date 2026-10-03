@@ -6,6 +6,7 @@ uniform vec4 uBoats[10];
 uniform vec4 uCoast;
 uniform vec2 uBeach;
 uniform vec4 uRipples[8];
+uniform float uMirror;
 uniform sampler2D mirrorSampler;
 varying vec4 vMirror;
 varying vec3 vWorld;
@@ -59,7 +60,7 @@ void main(){
  vec3 reflectedSky=mix(vec3(.20,.47,.57),vec3(.72,.86,.90),clamp(reflect(-viewDir,normal).y,0.0,1.0));
  vec2 mirrorUV=vMirror.xy/max(vMirror.w,.001)+normal.xz*.023;
  vec3 reflection=texture2D(mirrorSampler,clamp(mirrorUV,.001,.999)).rgb;
- reflectedSky=mix(reflection,reflectedSky,uUnderwater);
+ reflectedSky=mix(reflection,reflectedSky,max(uUnderwater,1.0-uMirror));
  vec3 color=mix(water,reflectedSky,fresnel*.92);
  vec3 sun=normalize(vec3(-.5,.75,-.35));
  float highlight=max(0.0,dot(reflect(-sun,normal),viewDir));

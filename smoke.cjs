@@ -3,7 +3,7 @@ const {chromium}=require('@playwright/test');
  const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:1440,height:900}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',message=>{if(message.type()==='error'&&/shader|VALIDATE_STATUS|GL_INVALID/i.test(message.text()))errors.push(message.text());});
- const names=['mosasaurus','diver','shark','boat','patrol','coast','rock','palm','umbrella','umbrella-orange','platform','lounger','pier','beach-bar','grass','coral','kelp','fish','dolphin','turtle','swimmer','jetski','sailboat','buoy','gull','ray','seal','jellyfish','kayak','surfer','sky','bubbles','bite-particle','sonar-ring'];
+ const names=['mosasaurus','diver','shark','boat','patrol','coast','rock','palm','umbrella','umbrella-orange','platform','lounger','pier','beach-bar','grass','coral','kelp','fish','dolphin','turtle','swimmer','jetski','sailboat','buoy','gull','ray','seal','jellyfish','kayak','surfer','orca','whale','sky','bubbles','bite-particle','sonar-ring'];
  const modelResponses=names.map(name=>page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/'+name+'.glb')));
  await page.goto('http://127.0.0.1:5173');await page.waitForSelector('#world canvas');await page.screenshot({path:'preview-title.png'});
  const models=await Promise.all(modelResponses);let modelBytes=0;
@@ -44,6 +44,13 @@ const {chromium}=require('@playwright/test');
  await page.screenshot({path:'preview-game.png'});
  await page.keyboard.down('KeyR');await page.waitForTimeout(1300);await page.keyboard.up('KeyR');
  await page.screenshot({path:'preview-surface.png'});
+ // The HUD rewrites only the mission line's leading text, which needs this exact structure:
+ // a text node first, with the counter element still inside the line. (Not a ten-kill playthrough.)
+ const missionLine=await page.evaluate(()=>{
+  const mission=document.querySelector('#missionText'),counter=document.querySelector('#count');
+  return !!counter&&mission.contains(counter)&&mission.firstChild.nodeType===Node.TEXT_NODE;
+ });
+ if(!missionLine)throw Error('Mission line must start with text and contain the counter');
  if(errors.length)throw Error(errors.join('\n'));
  console.log(JSON.stringify({webgl:true,loadedModels:names.length,modelBytes,automaticCapture:true,firstCaptureBP:bio,pauseResume:true,depth:await page.locator('#depth').textContent(),runtimeErrors:errors}));
  const failedPage=await browser.newPage();

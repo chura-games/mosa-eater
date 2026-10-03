@@ -48,7 +48,10 @@ try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-perfo
 renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;$('world').appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xd0edff,0x5b6651,.65));const sun=new THREE.DirectionalLight(0xffefce,3.3);sun.position.set(-70,105,-49);
-sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-105,right:105,top:105,bottom:-105,near:1,far:280});sun.shadow.normalBias=.08;sun.shadow.bias=-.00015;scene.add(sun);
+// The shadow box follows the player, so it stays sharp however large the map is.
+const sunOffset=new THREE.Vector3(-70,105,-49);
+Object.assign(sun.shadow.camera,{left:-85,right:85,top:85,bottom:-85,near:1,far:280});sun.shadow.normalBias=.08;sun.shadow.bias=-.00015;scene.add(sun,sun.target);
+renderer.shadowMap.autoUpdate=false;
 async function loadAssets(){
  const start=$('start') as HTMLButtonElement;
  start.disabled=true;start.textContent='海を準備中…';
@@ -69,10 +72,10 @@ const atmosphere=createAtmosphere(scene,renderer,assets);
 const effects=new Effects(scene,ocean.surfaceHeight,groundHeight);
 const prey:Human[]=[];
 function spawn(kind:PreyKind){const p=Human.create(kind,assets);prey.push(p);scene.add(p.mesh);return p;}
-const population:[PreyKind,number][]=[['diver',8],['shark',5],['turtle',3],['dolphin',3],['swimmer',5],['tourist',8],['surfer',3],['seal',3],['ray',3],['tuna',3],['orca',1],['jellyfish',6],['boat',3],['jetski',2],['kayak',2],['sailboat',2],['buoy',3]];
+const population:[PreyKind,number][]=[['diver',10],['shark',6],['turtle',4],['dolphin',4],['swimmer',7],['tourist',12],['surfer',4],['seal',3],['sealion',4],['ray',4],['tuna',4],['orca',2],['whale',2],['jellyfish',8],['boat',4],['jetski',3],['kayak',3],['sailboat',3],['buoy',5]];
 for(const [kind,count] of population)for(let i=0;i<count;i++)spawn(kind);
 // Three schools: each fish keeps a slot beside the first of its group.
-for(let school=0;school<3;school++){
+for(let school=0;school<4;school++){
  const leader=spawn('fish');
  for(let i=0;i<6;i++){const fish=spawn('fish');fish.leader=leader;fish.slot.set((i%3-1)*1.3+Math.random()*.5,(i%2)*.8-.4,1+Math.floor(i/3)*1.4+Math.random()*.5);fish.reset();}
 }
@@ -96,7 +99,7 @@ function damage(p:Human,amount:number,impact:THREE.Vector3){
  if(p.health>0){
   if(p.creature){
    // A wounded animal bleeds and bolts.
-   effects.blood(impact,size*.5);effects.gibs(impact,size*.4);sound.crunch(size*.6);flash=.5;player.gore=1;
+   effects.blood(impact,size*.5);effects.gibs(impact,size*.4);sound.crunch(size*.6);sound.cry(p.kind);flash=.5;player.gore=1;
    toast('深手を負わせた — あと'+p.health+'回');return;
   }
   // A wounded hull sheds a few pieces where it was struck.
@@ -106,11 +109,15 @@ function damage(p:Human,amount:number,impact:THREE.Vector3){
  p.alive=false;p.respawn=18;bio+=p.points;eaten++;panic=Math.min(100,panic+p.spec.panic);
  toast(p.label+' +'+p.points+' BP');
  if(p.creature){
-  sound.crunch(size);if(people.includes(p.kind))sound.scream();
+  sound.crunch(size);if(people.includes(p.kind))sound.deathScream();else sound.cry(p.kind);
   const ashore=impact.y>.4;
   effects.blood(impact,size*.7,ashore);flash=1;player.gore=1;
   if(!ashore&&p.mesh.position.y>-1.6){effects.splash(waterline(p.mesh.position),.6,0xc64a4a);ocean.ripple(p.mesh.position.x,p.mesh.position.z,.8);}
-  if(length<1.7){
+  if(length>9){
+   // Far too big to lift: it comes apart where it floats.
+   p.mesh.visible=false;effects.shatter(p.mesh,impact,28,true);effects.gibs(impact,2.4);effects.blood(p.mesh.position,2.4);effects.slick(p.mesh.position,2.6);effects.slick(impact,1.6);
+   ocean.ripple(p.mesh.position.x,p.mesh.position.z,2);player.chew=1;sound.gulp();shake=.6;
+  }else if(length<1.7){
    // Small prey goes down whole in a puff of blood.
    p.mesh.visible=false;effects.gibs(impact,.35);effects.slick(impact,.4,ashore?groundHeight(impact.x,impact.z)+.06:undefined);player.chew=.5;sound.gulp();
   }else{
@@ -123,7 +130,7 @@ function damage(p:Human,amount:number,impact:THREE.Vector3){
   if(p.kind!=='buoy'&&p.kind!=='sailboat'&&p.kind!=='kayak')effects.smoke(waterline(p.mesh.position).add(new THREE.Vector3(0,.8,0)),THREE.MathUtils.clamp(length/7,.5,1.3));
   sound.smash(size,p.kind==='patrol'||p.kind==='boat'||p.kind==='buoy');sound.splash(1.2);
   // Whoever was aboard does not get away either.
-  if(p.kind==='jetski'||p.kind==='kayak'){effects.blood(p.mesh.position,.9);effects.gibs(p.mesh.position,.8);effects.slick(p.mesh.position,.8);sound.scream();flash=.8;}
+  if(p.kind==='jetski'||p.kind==='kayak'){effects.blood(p.mesh.position,.9);effects.gibs(p.mesh.position,.8);effects.slick(p.mesh.position,.8);sound.deathScream();flash=.8;}
  }
 }
 const crosswise=new THREE.Quaternion().setFromEuler(new THREE.Euler(0,Math.PI/2,.3));
@@ -167,6 +174,9 @@ function applySettings(){
  ($('quality') as HTMLSelectElement).value=settings.quality;($('shadows') as HTMLSelectElement).value=settings.shadows?'on':'off';($('gore') as HTMLSelectElement).value=settings.gore;
  renderer.setPixelRatio(settings.quality==='high'?Math.min(devicePixelRatio,1.75):settings.quality==='medium'?Math.min(devicePixelRatio,1):Math.min(devicePixelRatio,1)*.7);
  renderer.setSize(innerWidth,innerHeight);
+ ocean.setMirror(settings.quality==='high'?'full':settings.quality==='medium'?'half':'off');
+ const shadowSize=settings.quality==='high'?2048:1024;
+ if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.mapSize.set(shadowSize,shadowSize);sun.shadow.map?.dispose();sun.shadow.map=null;}
  const shadows=settings.shadows&&settings.quality!=='low';
  if(renderer.shadowMap.enabled!==shadows||sun.castShadow!==shadows){
   renderer.shadowMap.enabled=shadows;sun.castShadow=shadows;
@@ -208,12 +218,14 @@ function hud(){
  const stage=Math.min(maxLevel,Math.floor(bio/stepPoints));
  $('growthValue').textContent='Lv '+(stage+1);$('growthBar').style.width=(stage>=maxLevel?100:bio%stepPoints/stepPoints*100)+'%';
  $('growthText').textContent=stage>=maxLevel?'最大の体格に到達した。':'次の成長まで '+(stepPoints-bio%stepPoints)+' BP';
- $('count').textContent=Math.min(eaten,10)+' / 10';$('missionBar').style.width=Math.min(eaten*10,100)+'%';
- if(eaten>=10)$('missionText').textContent='海岸の覇者になった。狩りは続く。';
+ // Past the first goal the line turns into a running total. Only the label's own text is
+ // replaced: rewriting the whole line would delete the counter inside it.
+ $('count').textContent=eaten<10?eaten+' / 10':String(eaten);$('missionBar').style.width=Math.min(eaten*10,100)+'%';
+ $('missionText').firstChild!.textContent=eaten<10?'獲物を捕食する ':'海岸の覇者。捕食数 ';
  $('status').textContent=panic>=50?'迎撃艇が接近中。船ごと噛み砕け。':panic>20?'観光客が逃走中。浜まで追い詰めろ。':'海岸は穏やかだ。狩りを始めよう。';
  $('depth').textContent='DEPTH '+Math.max(0,-player.mesh.position.y).toFixed(0)+'m';
 }
-let previous=performance.now(),hudTimer=0;
+let previous=performance.now(),hudTimer=0,frame=0,screamWait=0;
 function loop(now:number){
  requestAnimationFrame(loop);const dt=Math.min((now-previous)/1000,.05);previous=now;
  if(!paused){
@@ -221,16 +233,26 @@ function loop(now:number){
  for(const gull of gulls)gull.update(dt,time);
  if(running){
   let boost=false;
-  for(const p of prey){
+  frame++;screamWait-=dt;
+  const seeFar=camera.position.y>ocean.surfaceHeight(camera.position.x,camera.position.z,time)?Infinity:125;
+  prey.forEach((p,index)=>{
    const wasAlive=p.alive;
    p.update(dt,time,player.mesh.position,panic);
-   if(!p.alive)continue;
+   if(!p.alive)return;
    if(!wasAlive)placePrey(p);
+   // Anything lost in the haze is not drawn at all.
+   p.mesh.visible=p.mesh.position.distanceToSquared(camera.position)<seeFar*seeFar;
    // Terrain pushes the body clear; it then steers back to open water instead of bouncing.
+   // Terrain checks alternate between two halves of the population each frame.
    const proxy=[new THREE.Sphere(new THREE.Vector3(),p.ship?1.6:.55)];
-   if(p.kind!=='buoy'&&ocean.collisions.resolve(p.mesh,proxy))p.avoid();
-   if(p.splashed){p.splashed=false;effects.splash(waterline(p.mesh.position),.7);ocean.ripple(p.mesh.position.x,p.mesh.position.z,.7);if(p.mesh.position.distanceTo(player.mesh.position)<45)sound.splash(.5);}
-  }
+   if((index+frame)%2===0&&p.kind!=='buoy'&&p.kind!=='tourist'&&ocean.collisions.resolve(p.mesh,proxy))p.avoid();
+   if(p.alarmed){
+    p.alarmed=false;
+    const near=1-p.mesh.position.distanceTo(player.mesh.position)/70;
+    if(near>0&&screamWait<=0){screamWait=.3;sound.scream(.35+near*.65);}
+   }
+   if(p.splashed){p.splashed=false;const blow=p.kind==='whale'?1.7:.7;effects.splash(waterline(p.mesh.position),blow);ocean.ripple(p.mesh.position.x,p.mesh.position.z,blow);if(p.mesh.position.distanceTo(player.mesh.position)<45)sound.splash(.5);}
+  });
 
  // Small simulation steps keep fast boosts and turning from crossing thin obstacles.
  const steps=Math.ceil(dt/(1/120)),stepDt=dt/steps,before=new THREE.Vector3();
@@ -281,10 +303,13 @@ function loop(now:number){
  $('crosshair').style.color=biteTarget()?'#c3f865':'#d1f8cb66';
  panic=Math.max(0,panic-dt*.45);toastTimer-=dt;if(toastTimer<=0)$('toast').textContent='';
 
- if(panic>=50&&!patrolSpawned){patrolSpawned=true;for(let i=0;i<4;i++){const p=spawn('patrol');p.mesh.position.set(-40+i*22,0,65);placePrey(p);marineLight.apply(p.mesh);}toast('警戒レベル上昇 — 迎撃艇出動');sound.alarm();}
+ if(panic>=50&&!patrolSpawned){patrolSpawned=true;for(let i=0;i<4;i++){const p=spawn('patrol');p.mesh.position.set(player.mesh.position.x-40+i*26,0,Math.min(200,player.mesh.position.z+70));placePrey(p);marineLight.apply(p.mesh);}toast('警戒レベル上昇 — 迎撃艇出動');sound.alarm();}
  for(const p of prey){if(p.kind==='patrol'&&p.alive&&p.mesh.position.distanceTo(player.mesh.position)<8){player.energy=Math.max(0,player.energy-dt*12);}}
  }
  else{player.tail.rotation.y=0;}
+ // Shadows move with the player in 8 m steps. High quality redraws them every frame.
+ sun.target.position.set(Math.round(player.mesh.position.x/8)*8,0,Math.round(player.mesh.position.z/8)*8);sun.position.copy(sun.target.position).add(sunOffset);sun.target.updateMatrixWorld();
+ if(settings.quality==='high'||frame%2===0)renderer.shadowMap.needsUpdate=true;
  // Follow after everything has moved, so the camera never trails by a frame.
  followCamera.update(camera,dt,running?view:{yaw:-.5,pitch:0},player.mesh.position,player.scale,shake,groundHeight);
  shake=Math.max(0,shake-dt);flash=Math.max(0,flash-dt*1.1);$('bloodFlash').style.opacity=String(Math.min(1,flash)*(settings.gore==='mild'?.3:.75));

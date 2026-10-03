@@ -49,7 +49,8 @@ export function terrain(){
  for(const [name,minD,maxD] of [['Seabed',coreSeaward,-12],['Beach',-12,32],['SandDune',32,coreInland]]){
   const band=new THREE.Group();band.name=name;map.add(band);
   for(let tile=0;tile<8;tile++){
-   const nx=20,nz=Math.ceil((maxD-minD)/(name==='Seabed'?5:2)),vertices=[],colors=[],indices=[];
+   // 2 m cells across, as before the map was widened.
+   const nx=30,nz=Math.ceil((maxD-minD)/(name==='Seabed'?5:2)),vertices=[],colors=[],indices=[];
    for(let ix=0;ix<=nx;ix++)for(let iz=0;iz<=nz;iz++){
     const x=-profile.mapHalfWidth+(tile+ix/nx)*profile.mapHalfWidth/4,d=minD+(maxD-minD)*iz/nz,z=shoreZ(x)-d,y=groundHeight(x,z);
     vertices.push(x,y,z);

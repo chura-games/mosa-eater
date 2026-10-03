@@ -18,6 +18,7 @@ objects/ に個別モデルを保存します。配置座標はモデル内に�
 - swimmer.glb：水着の遊泳者。
 - jetski.glb、sailboat.glb、buoy.glb：乗り手付きの水上バイク、帆とキールを持つヨット、灯火付きのブイ。
 - ray.glb、seal.glb、jellyfish.glb：エイ、アザラシ、クラゲ。
+- orca.glb、whale.glb：白黒模様のシャチ、体長約14mのクジラ（長い胸びれ、水平の尾びれ）。
 - kayak.glb、surfer.glb：漕ぎ手付きのカヤック、ボードに乗ったサーファー。
 - gull.glb、kelp.glb：景色用のカモメと海藻。
 動かすパーツは名前付きの親ノードにまとめています：Tail（左右に振る尾）、TailV（上下に振る尾）、WingL / WingR（羽ばたき）、ArmL / ArmR（腕）、LegL / LegR（脚）。編集・差し替え時も名前と回転の支点を維持してください。ダイバーは泳ぐ姿勢（うつ伏せ）で保存しています。

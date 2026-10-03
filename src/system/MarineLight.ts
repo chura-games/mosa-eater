@@ -35,7 +35,7 @@ vMarineUp=normalize(mat3(marineModel)*objectNormal).y;`);
      shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\n#ifdef SURFACE_SAND\nroughnessFactor=mix(.65,.94,smoothstep(.1,1.5,vMarineWorld.y));\n#endif');
      shader.fragmentShader=shader.fragmentShader.replace('#include <tonemapping_fragment>',marineLight+'\n#include <tonemapping_fragment>');
     };
-    material.customProgramCacheKey=()=> 'marine-surface-v4-'+surface;material.needsUpdate=true;
+    material.customProgramCacheKey=()=> 'marine-surface-v5-'+surface;material.needsUpdate=true;
    }
   });
  }

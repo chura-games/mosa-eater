@@ -31,6 +31,8 @@ const urls={
  jellyfish:new URL('../assets/objects/jellyfish.glb',import.meta.url).href,
  kayak:new URL('../assets/objects/kayak.glb',import.meta.url).href,
  surfer:new URL('../assets/objects/surfer.glb',import.meta.url).href,
+ orca:new URL('../assets/objects/orca.glb',import.meta.url).href,
+ whale:new URL('../assets/objects/whale.glb',import.meta.url).href,
  sky:new URL('../assets/effects/sky.glb',import.meta.url).href,
  bubbles:new URL('../assets/effects/bubbles.glb',import.meta.url).href,
  particle:new URL('../assets/effects/bite-particle.glb',import.meta.url).href,

@@ -20,12 +20,17 @@ export function createOcean(scene:THREE.Scene,assets:ModelAssets){
  let bubbleTime=0;
  const update=(time:number,camera:THREE.Camera,player?:Parameters<typeof updateWater>[2],ships?:Parameters<typeof updateWater>[3])=>{
   const dt=Math.min(.1,Math.max(0,time-bubbleTime));bubbleTime=time;
+  // The cloud of bubbles is a 90 m box that wraps around the camera, so it covers any size of map.
+  const wrapAround=(value:number,center:number)=>value-Math.round((value-center)/90)*90;
   for(let i=0;i<bubblePositions.count;i++){
    let y=bubblePositions.getY(i)+dt*(.5+(i%5)*.16);
    if(y>-.4)y=-28;
-   bubblePositions.setY(i,y);bubblePositions.setX(i,bubblePositions.getX(i)+Math.sin(time*1.7+i)*dt*.12);
+   bubblePositions.setXYZ(i,wrapAround(bubblePositions.getX(i)+Math.sin(time*1.7+i)*dt*.12,camera.position.x),y,wrapAround(bubblePositions.getZ(i),camera.position.z));
   }
   bubblePositions.needsUpdate=true;updateWater(time,camera,player,ships);
+  // Under water nothing beyond about 125 m shows through the haze, so those sectors are not drawn.
+  const submerged=camera.position.y<surfaceHeight(camera.position.x,camera.position.z,time)-.5;
+  for(const sector of sectors){const sphere=sector.boundingSphere!;sector.visible=!submerged||sphere.center.distanceTo(camera.position)<125+sphere.radius;}
  };
  const pointsMaterial=bubbles.material as THREE.PointsMaterial;
  pointsMaterial.size=Number(bubbles.userData.pointSize??.12);
@@ -45,16 +50,20 @@ export function createOcean(scene:THREE.Scene,assets:ModelAssets){
  const batches=new Map<string,{mesh:THREE.Mesh,matrices:THREE.Matrix4[]}>();
  objects.traverse(node=>{
   if(!(node instanceof THREE.Mesh)||Array.isArray(node.material))return;
-  const key=node.geometry.uuid+':'+node.material.uuid;
+  // One batch per 70 m sector, so the renderer can skip sectors that are off screen,
+  // outside the shadow box, or lost in the underwater haze.
+  const key=node.geometry.uuid+':'+node.material.uuid+':'+Math.floor(node.matrixWorld.elements[12]/70)+':'+Math.floor(node.matrixWorld.elements[14]/70);
   if(!batches.has(key))batches.set(key,{mesh:node,matrices:[]});
   batches.get(key)!.matrices.push(node.matrixWorld.clone());
  });
  const scenery=new THREE.Group();scenery.name='MapObjects';
+ const sectors:THREE.InstancedMesh[]=[];
  for(const {mesh,matrices} of batches.values()){
   const batch=new THREE.InstancedMesh(mesh.geometry,mesh.material,matrices.length);
   batch.name=mesh.name;batch.userData={...mesh.userData};
-  matrices.forEach((matrix,i)=>batch.setMatrixAt(i,matrix));batch.computeBoundingSphere();scenery.add(batch);
+  matrices.forEach((matrix,i)=>batch.setMatrixAt(i,matrix));batch.computeBoundingSphere();scenery.add(batch);sectors.push(batch);
  }
  scene.add(map,scenery,effects);
- return {update,collisions,surfaceHeight,ripple:updateWater.ripple};
+ bubbles.frustumCulled=false;
+ return {update,collisions,surfaceHeight,ripple:updateWater.ripple,setMirror:updateWater.setMirror};
 }

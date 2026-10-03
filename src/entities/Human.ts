@@ -4,7 +4,7 @@ import {modelBounds,orientedBounds,transformedBounds} from '../system/Collision'
 import {groundHeight,shoreZ,playBounds} from '../system/Coast';
 import {surfaceHeight} from '../system/Water';
 import type {AssetName,ModelAssets} from '../system/ModelAssets';
-export type PreyKind='diver'|'shark'|'boat'|'patrol'|'fish'|'turtle'|'dolphin'|'swimmer'|'jetski'|'sailboat'|'buoy'|'tuna'|'orca'|'ray'|'seal'|'jellyfish'|'kayak'|'surfer'|'tourist';
+export type PreyKind='diver'|'shark'|'boat'|'patrol'|'fish'|'turtle'|'dolphin'|'swimmer'|'jetski'|'sailboat'|'buoy'|'tuna'|'orca'|'ray'|'seal'|'jellyfish'|'kayak'|'surfer'|'tourist'|'whale'|'sealion';
 // asset/size/tint let one model serve several kinds (a tuna is a large fish, an orca a dark, heavy dolphin).
 type Spec={asset?:AssetName,size?:number,tint?:number,upright?:boolean,speed:number,flee:number,turn:number,points:number,health:number,panic:number,label:string,creature:boolean,floats?:boolean,beat:number};
 // speed/flee in m/s, turn in rad/s, beat = swim-cycle rate per m/s of speed.
@@ -20,7 +20,10 @@ const specs:Record<PreyKind,Spec>={
  jetski:{speed:7,flee:12,turn:1.5,points:50,health:1,panic:14,label:'水上バイクを破壊',creature:false,floats:true,beat:0},
  sailboat:{speed:1.8,flee:2.6,turn:.35,points:90,health:3,panic:16,label:'ヨットを破壊',creature:false,floats:true,beat:0},
  tuna:{asset:'fish',size:2.3,tint:0x8f9fb8,speed:4.2,flee:11,turn:2.2,points:35,health:1,panic:2,label:'マグロを捕食',creature:true,beat:2},
- orca:{asset:'dolphin',size:2.5,tint:0x3a3d44,speed:4,flee:8,turn:1.2,points:120,health:2,panic:6,label:'シャチを捕食',creature:true,beat:.7},
+ orca:{speed:4,flee:8.5,turn:1.2,points:120,health:2,panic:6,label:'シャチを捕食',creature:true,beat:.75},
+ // Too big to carry off: it takes four bites and comes up to blow.
+ whale:{speed:2,flee:4.2,turn:.45,points:250,health:4,panic:8,label:'クジラを捕食',creature:true,beat:.42},
+ sealion:{asset:'seal',size:1.35,tint:0xd2a877,speed:3,flee:7.5,turn:2.6,points:55,health:1,panic:4,label:'アシカを捕食',creature:true,beat:1.8},
  ray:{speed:1.6,flee:4.5,turn:1.3,points:35,health:1,panic:2,label:'エイを捕食',creature:true,beat:1.6},
  seal:{speed:2.6,flee:6.5,turn:2.4,points:45,health:1,panic:4,label:'アザラシを捕食',creature:true,beat:2},
  jellyfish:{speed:.25,flee:.25,turn:.5,points:5,health:1,panic:0,label:'クラゲを捕食',creature:true,beat:6},
@@ -39,6 +42,9 @@ export class Human{
  readonly localBounds:THREE.Box3;health=1;ramCooldown=0;speed=0;
  // Set when the body breaks the surface; the game turns it into a splash.
  splashed=false;
+ // Set at the moment a person first sees the danger; the game turns it into a scream.
+ alarmed=false;
+ private wasThreatened=false;
  // Schooling fish hold a slot beside their leader.
  leader?:Human;slot=new THREE.Vector3();
  private readonly parts:{bounds:THREE.Box3,matrix:THREE.Matrix4}[]=[];
@@ -46,7 +52,7 @@ export class Human{
  private baked=false;
  private readonly rig:{tail?:THREE.Object3D,tailV?:THREE.Object3D,wings:THREE.Object3D[],arms:THREE.Object3D[],legs:THREE.Object3D[]};
  private wander=this.heading;private wanderTimer=0;private depthGoal=-5;
- private pitch=0;private roll=0;private turnRate=0;private swim=random(0,6);private vertical=0;private leaping=false;private leapTimer=random(4,12);
+ private pitch=0;private roll=0;private turnRate=0;private swim=random(0,6);private vertical=0;private leaping=false;private leapTimer=random(4,12);private breath=random(6,18);
  static create(kind:PreyKind,assets:ModelAssets){
   const spec=specs[kind],model=assets.instantiate(spec.asset??kind as AssetName);
   if(spec.size)model.scale.setScalar(spec.size);
@@ -87,6 +93,8 @@ export class Human{
  let x=random(-playBounds.halfWidth+12,playBounds.halfWidth-12),z=random(shoreZ(x)+14,playBounds.maxZ-12);
  // Swimmers stay within sight of the beach; a school regroups around its leader.
  if(this.kind==='swimmer')z=shoreZ(x)+random(12,30);
+ // The big animals keep to deep water.
+ if(this.kind==='whale'||this.kind==='orca')z=random(shoreZ(x)+70,playBounds.maxZ-15);
  if(this.kind==='tourist'){z=shoreZ(x)-random(4,20);this.mesh.position.set(x,groundHeight(x,z)+standing,z);this.wander=this.heading;this.wanderTimer=random(1,5);return;}
  if(this.leader){x=THREE.MathUtils.clamp(this.leader.mesh.position.x+this.slot.x,-playBounds.halfWidth+12,playBounds.halfWidth-12);z=THREE.MathUtils.clamp(this.leader.mesh.position.z+this.slot.z,shoreZ(x)+14,playBounds.maxZ-12);}
  const floor=groundHeight(x,z);
@@ -105,6 +113,8 @@ export class Human{
  const delta=position.clone().sub(player),distance=delta.length();
  if(this.kind==='tourist'){this.walk(dt,delta,distance);return;}
  const threatened=this.kind!=='patrol'&&distance<(spec.creature?26:32)&&(panic>10||distance<6);
+ if(threatened&&!this.wasThreatened&&(this.kind==='diver'||this.kind==='swimmer'||this.kind==='surfer'||this.kind==='kayak'||this.kind==='jetski'||this.kind==='boat'||this.kind==='sailboat'))this.alarmed=true;
+ this.wasThreatened=threatened;
  this.wanderTimer-=dt;
  if(this.wanderTimer<=0){
   this.wander=this.heading+random(-1.3,1.3);this.wanderTimer=random(3,8);
@@ -150,7 +160,7 @@ export class Human{
   this.vertical-=9.8*dt;position.y+=this.vertical*dt;pitch=Math.atan2(this.vertical,Math.max(this.speed,1));
   if(position.y<-.6&&this.vertical<0){this.leaping=false;this.leapTimer=random(5,13);this.vertical=-2;this.splashed=true;this.depthGoal=-3;}
  }else{
-  const floor=groundHeight(position.x,position.z),goal=THREE.MathUtils.clamp(this.depthGoal,floor+1,-.9);
+  const floor=groundHeight(position.x,position.z),goal=THREE.MathUtils.clamp(this.depthGoal,floor+(this.kind==='whale'?2.6:1),this.kind==='whale'?-1.8:-.9);
   const limit=Math.max(.4,this.speed*.45);
   this.vertical=THREE.MathUtils.damp(this.vertical,THREE.MathUtils.clamp((goal-position.y)*.7,-limit,limit),3,dt);
   position.y=THREE.MathUtils.clamp(position.y+this.vertical*dt,floor+.8,-.7);
@@ -160,6 +170,11 @@ export class Human{
    if(this.leapTimer<0&&floor<-5){this.depthGoal=-1;if(position.y>-1.4&&this.speed>3){this.leaping=true;this.vertical=5.5+this.speed*.25;this.splashed=true;}}
   }
   if(this.kind==='diver')roll+=stroke*.07;
+  if(this.kind==='whale'){
+   // Surface to breathe every so often; the game turns the flag into a spout.
+   this.breath-=dt;
+   if(this.breath<0){this.depthGoal=-1.8;if(position.y>-2.6){this.splashed=true;this.breath=random(14,26);this.depthGoal=random(Math.max(-19,floor+3),-6);this.wanderTimer=random(6,10);}}
+  }
  }
  this.pitch=THREE.MathUtils.damp(this.pitch,pitch,spec.floats?5:4,dt);this.roll=THREE.MathUtils.damp(this.roll,roll,spec.floats?5:4,dt);
  this.mesh.rotation.set(this.pitch,this.heading+Math.PI,this.roll);
@@ -177,6 +192,8 @@ export class Human{
  // Strolling on the beach, or running from something that has come up out of the sea.
  private walk(dt:number,delta:THREE.Vector3,distance:number){
   const spec=this.spec,position=this.mesh.position,scared=distance<22;
+  if(scared&&!this.wasThreatened)this.alarmed=true;
+  this.wasThreatened=scared;
   this.wanderTimer-=dt;
   if(this.wanderTimer<=0){this.wander=this.heading+random(-1.6,1.6);this.wanderTimer=random(2,6);}
   let desired=scared?Math.atan2(delta.x,delta.z):this.wander;
