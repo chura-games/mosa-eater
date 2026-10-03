@@ -3,16 +3,19 @@
  const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:1440,height:900}});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
- const names=['mosasaurus','diver','shark','boat','patrol','environment','bite-particle','sonar-ring'];
- const modelResponses=names.map(name=>page.waitForResponse(response=>response.url().includes('/'+name)&&response.url().includes('.glb')));
+ const names=['mosasaurus','diver','shark','boat','patrol','coast','rock','palm','umbrella','umbrella-orange','platform','bubbles','bite-particle','sonar-ring'];
+ const modelResponses=names.map(name=>page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/'+name+'.glb')));
  await page.goto('http://127.0.0.1:5173');await page.waitForSelector('#world canvas');await page.screenshot({path:'preview-title.png'});
  const models=await Promise.all(modelResponses);let modelBytes=0;
  for(let i=0;i<models.length;i++){
   const model=models[i];if(!model.ok())throw Error('GLB model request failed: '+names[i]);
   const bytes=await model.body();if(bytes.toString('ascii',0,4)!=='glTF')throw Error('Invalid GLB model: '+names[i]);
   const json=JSON.parse(bytes.toString('utf8',20,20+bytes.readUInt32LE(12)).trim());
-  if(names[i]==='environment')for(const nodeName of ['Water','Seabed','Beach','Platform','Bubbles']){
-   if(!json.nodes.some(node=>node.name===nodeName))throw Error('Missing environment node: '+nodeName);
+  if(names[i]==='coast'){
+   for(const nodeName of ['Water','Seabed','Beach','SandDune']){
+    if(!json.nodes.some(node=>node.name===nodeName))throw Error('Missing map node: '+nodeName);
+   }
+   if(json.nodes.some(node=>/Platform|Palm|Rock|Umbrella|Bubbles/.test(node.name??'')))throw Error('Map contains prop models');
   }
   modelBytes+=bytes.length;
  }
@@ -24,7 +27,7 @@
  if(errors.length)throw Error(errors.join('\n'));
  console.log(JSON.stringify({webgl:true,loadedModels:names.length,modelBytes,firstCaptureBP:bio,pauseResume:true,sonar:true,depth:await page.locator('#depth').textContent(),runtimeErrors:errors}));
  const failedPage=await browser.newPage();
- await failedPage.route('**/environment*.glb',route=>route.abort());
+ await failedPage.route('**/maps/coast*.glb',route=>route.abort());
  await failedPage.goto('http://127.0.0.1:5173');
  await failedPage.waitForFunction(()=>document.querySelector('#start').textContent.includes('モデル読み込み失敗'));
  if(await failedPage.locator('#start').isEnabled())throw Error('Start allowed after model load failure');

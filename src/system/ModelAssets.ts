@@ -1,14 +1,20 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 const urls={
- mosasaurus:new URL('../assets/mosasaurus.glb',import.meta.url).href,
- diver:new URL('../assets/diver.glb',import.meta.url).href,
- shark:new URL('../assets/shark.glb',import.meta.url).href,
- boat:new URL('../assets/boat.glb',import.meta.url).href,
- patrol:new URL('../assets/patrol.glb',import.meta.url).href,
- environment:new URL('../assets/environment.glb',import.meta.url).href,
- particle:new URL('../assets/bite-particle.glb',import.meta.url).href,
- sonar:new URL('../assets/sonar-ring.glb',import.meta.url).href,
+ mosasaurus:new URL('../assets/objects/mosasaurus.glb',import.meta.url).href,
+ diver:new URL('../assets/objects/diver.glb',import.meta.url).href,
+ shark:new URL('../assets/objects/shark.glb',import.meta.url).href,
+ boat:new URL('../assets/objects/boat.glb',import.meta.url).href,
+ patrol:new URL('../assets/objects/patrol.glb',import.meta.url).href,
+ coast:new URL('../assets/maps/coast.glb',import.meta.url).href,
+ rock:new URL('../assets/objects/rock.glb',import.meta.url).href,
+ palm:new URL('../assets/objects/palm.glb',import.meta.url).href,
+ umbrella:new URL('../assets/objects/umbrella.glb',import.meta.url).href,
+ umbrellaOrange:new URL('../assets/objects/umbrella-orange.glb',import.meta.url).href,
+ platform:new URL('../assets/objects/platform.glb',import.meta.url).href,
+ bubbles:new URL('../assets/effects/bubbles.glb',import.meta.url).href,
+ particle:new URL('../assets/effects/bite-particle.glb',import.meta.url).href,
+ sonar:new URL('../assets/effects/sonar-ring.glb',import.meta.url).href,
 };
 export type AssetName=keyof typeof urls;
 export class ModelAssets{
