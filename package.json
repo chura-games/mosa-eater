@@ -1,0 +1,21 @@
+{
+    "name":  "abyssal-apex",
+    "version":  "0.1.0",
+    "private":  true,
+    "type":  "module",
+    "scripts":  {
+                    "dev":  "vite --host 127.0.0.1",
+                    "build":  "tsc --noEmit \u0026\u0026 vite build",
+                    "preview":  "vite preview --host 127.0.0.1",
+                    "test:smoke":  "node smoke.cjs"
+                },
+    "dependencies":  {
+                         "three":  "^0.180.0"
+                     },
+    "devDependencies":  {
+                            "@playwright/test":  "^1.63.0",
+                            "@types/three":  "^0.180.0",
+                            "typescript":  "~5.8.3",
+                            "vite":  "^6.1.0"
+                        }
+}

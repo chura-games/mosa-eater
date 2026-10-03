@@ -6,3 +6,9 @@
 *.blend2
 *.blend@
 __pycache__/
+
+node_modules/
+dist/
+*.log
+
+preview-*.png
