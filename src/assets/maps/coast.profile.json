@@ -5,8 +5,11 @@
   "seaSlope": 0.34,
   "beachSlope": 0.12,
   "floorDepth": 30,
-  "mapHalfWidth": 240,
-  "playHalfWidth": 200,
+  "deepDepth": 55,
+  "deepStart": 140,
+  "deepEnd": 430,
+  "mapHalfWidth": 480,
+  "playHalfWidth": 440,
   "playMinZ": -52,
-  "playMaxZ": 210
+  "playMaxZ": 640
 }

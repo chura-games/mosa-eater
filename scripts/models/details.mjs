@@ -11,7 +11,8 @@ export function optimize(root,hitboxes=false){
   const buckets=new Map();
   for(const node of [...parent.children]){
    if(!node.isMesh){batch(node);continue;}
-   if(node.name.startsWith('Flipper'))continue;
+   // Flippers move on their own, and skinned hides must keep their bone weights.
+   if(node.name.startsWith('Flipper')||node.isSkinnedMesh)continue;
    const m=node.material;
    const key=[m.color.getHex(),m.roughness,m.metalness,m.vertexColors,m.side,m.userData.surface,node.userData.noCollision,Object.keys(node.geometry.attributes).sort().join()].join(':');
    if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(node);

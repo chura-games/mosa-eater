@@ -16,10 +16,14 @@ export function transformedBounds(local:THREE.Box3,matrix:THREE.Matrix4){
 export class CollisionWorld{
  private solids:{box:THREE.Box3,triangles:THREE.Triangle[]}[]=[];
  private cells=new Map<string,{box:THREE.Box3,triangle:THREE.Triangle}[]>();
+ // Given the terrain's height formula, the sand and seabed tiles are not stored as triangles:
+ // the formula is exact, costs no memory, and works for a map of any size.
+ constructor(private ground?:(x:number,z:number)=>number){}
  add(root:THREE.Object3D){
   root.updateMatrixWorld(true);
   root.traverse(node=>{
    if(!(node instanceof THREE.Mesh)||node.name==='Water'||node.userData.noCollision)return;
+   if(this.ground&&/Tile\d+$/.test(node.name))return;
    const position=node.geometry.attributes.position,index=node.geometry.index;
    const triangles:THREE.Triangle[]=[];
    for(let i=0;i<(index?.count??position.count);i+=3){
@@ -37,6 +41,10 @@ export class CollisionWorld{
  blocked(from:THREE.Vector3,to:THREE.Vector3){
   const delta=to.clone().sub(from),distance=delta.length();
   if(distance<.001)return false;
+  if(this.ground){
+   const steps=Math.ceil(distance/1.5);
+   for(let i=1;i<steps;i++){const t=i/steps,x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;if(from.y+(to.y-from.y)*t<this.ground(x,z))return true;}
+  }
   const ray=new THREE.Ray(from,delta.normalize()),hit=new THREE.Vector3();
   return this.solids.some(solid=>ray.intersectsBox(solid.box)&&solid.triangles.some(triangle=>{
    return ray.intersectTriangle(triangle.a,triangle.b,triangle.c,false,hit)!==null&&hit.distanceTo(from)<distance-.05;
@@ -66,6 +74,20 @@ export class CollisionWorld{
    }
    }
    if(!passContact)break;
+  }
+  if(this.ground){
+   const ground=this.ground,normal=new THREE.Vector3();
+   for(const local of localSpheres){
+    object.updateMatrixWorld(true);
+    const sphere=local.clone().applyMatrix4(object.matrixWorld),{x,z}=sphere.center,height=ground(x,z);
+    if(sphere.center.y-sphere.radius>height+sphere.radius*.5)continue;
+    // Distance to the slope, measured along its normal.
+    const step=Math.max(.25,sphere.radius*.5);
+    normal.set(ground(x-step,z)-ground(x+step,z),2*step,ground(x,z-step)-ground(x,z+step)).normalize();
+    const gap=(sphere.center.y-height)*normal.y;
+    if(gap>=sphere.radius)continue;
+    object.position.addScaledVector(normal,sphere.radius-gap+.002);collided=true;
+   }
   }
   return collided;
  }

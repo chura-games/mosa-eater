@@ -9,7 +9,7 @@ export async function runCoastTests(){
  const assets=await ModelAssets.load(),map=assets.instantiate('coast');
  const beach=map.getObjectByName('Beach')!,bounds=new THREE.Box3().setFromObject(beach);
  if(Math.abs(bounds.max.x-bounds.min.x-profile.mapHalfWidth*2)>.01)throw new Error('Beach must extend across the compact map');
- const terrain=new CollisionWorld();terrain.add(map);
+ const terrain=new CollisionWorld(groundHeight);terrain.add(map);
  for(const x of [-140,0,140]){
   const z=shoreZ(x)-20,y=groundHeight(x,z);
   if(!terrain.blocked(new THREE.Vector3(x,y+3,z),new THREE.Vector3(x,y-3,z)))throw new Error('Missing continuous beach collision');

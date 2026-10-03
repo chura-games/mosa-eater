@@ -5,6 +5,7 @@ export function shoreZ(x:number){return profile.shoreZ+profile.curveAmplitude*Ma
 export function groundHeight(x:number,z:number){
  const d=shoreZ(x)-z;
  // Keep in sync with scripts/models/beach.mjs and the ground formula in shaders/water.frag.
- if(d<0)return -profile.floorDepth*Math.tanh(-d*profile.seaSlope/profile.floorDepth)+.6*Math.sin(x*.083+1)*Math.sin(z*.071)*MathUtils.smoothstep(-d,4,24);
+ // A shelf near the coast, then a second drop into deep water far offshore.
+ if(d<0)return -profile.floorDepth*Math.tanh(-d*profile.seaSlope/profile.floorDepth)-profile.deepDepth*MathUtils.smoothstep(-d,profile.deepStart,profile.deepEnd)+.6*Math.sin(x*.083+1)*Math.sin(z*.071)*MathUtils.smoothstep(-d,4,24);
  return d*profile.beachSlope+MathUtils.smoothstep(d,12,50)*(1+.65*Math.sin(x*.02))*(.6+.4*Math.sin(d*.035));
 }

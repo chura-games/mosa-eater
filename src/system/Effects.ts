@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {random} from '../utils/random';
 
 type Puff={sprite:THREE.Sprite,velocity:THREE.Vector3,life:number,span:number,from:number,to:number,opacity:number,gravity:number,ceiling:boolean};
-type Fragment={mesh:THREE.Mesh,velocity:THREE.Vector3,spin:THREE.Vector3,life:number,scale:THREE.Vector3,floats:boolean,wet:boolean,bleed:number,drip:number};
+type Fragment={mesh:THREE.Mesh,velocity:THREE.Vector3,spin:THREE.Vector3,life:number,scale:THREE.Vector3,floats:boolean,wet:boolean,bleed:number,drip:number,size:number};
 type Slick={mesh:THREE.Mesh,life:number,span:number,size:number,height?:number};
 
 // Blood, flesh, spray, smoke and wreckage. Everything is generated here: no image files.
@@ -43,7 +43,7 @@ export class Effects{
  // A quick spurt, used for each shake of a body held in the jaws.
  spurt(position:THREE.Vector3,direction:THREE.Vector3,size=1){
   for(let i=0;i<Math.round(5*this.gore);i++){
-   const velocity=direction.clone().multiplyScalar(random(2,6)).add(new THREE.Vector3(random(-1,1),random(-1,1),random(-1,1)).multiplyScalar(1.6));
+   const velocity=direction.clone().multiplyScalar(random(2,6)).add(new THREE.Vector3(random(-1,1),random(-1,1),random(-1,1)).multiplyScalar(1.6)).multiplyScalar(Math.min(1,size*1.4));
    this.puff(position.clone(),velocity,i%2?0x7a0c10:0x4a0609,random(1.6,3),random(.25,.5)*size,random(1.4,2.6)*size,random(.35,.55),0,true);
   }
  }
@@ -61,8 +61,8 @@ export class Effects{
    const white=i%5===4,mesh=new THREE.Mesh(this.chunk,white?this.bone:this.flesh[i%3]);
    mesh.position.copy(position).add(new THREE.Vector3(random(-.3,.3),random(-.3,.3),random(-.3,.3)).multiplyScalar(size));
    mesh.scale.set(random(.06,.2),random(.05,.14),random(.08,white?.36:.24)).multiplyScalar(size);mesh.rotation.set(random(0,6),random(0,6),random(0,6));this.scene.add(mesh);
-   const velocity=new THREE.Vector3(random(-1,1),random(-.4,1),random(-1,1)).multiplyScalar(random(2,6.5));
-   this.fragments.push({mesh,velocity,spin:new THREE.Vector3(random(-7,7),random(-7,7),random(-7,7)),life:random(7,11),scale:mesh.scale.clone(),floats:false,wet:true,bleed:white?0:random(1.5,3),drip:0});
+   const velocity=new THREE.Vector3(random(-1,1),random(-.4,1),random(-1,1)).multiplyScalar(random(2,6.5)*Math.min(1.5,Math.sqrt(size)));
+   this.fragments.push({mesh,velocity,spin:new THREE.Vector3(random(-7,7),random(-7,7),random(-7,7)),life:random(7,11),scale:mesh.scale.clone(),floats:false,wet:true,bleed:white?0:random(1.5,3),drip:0,size:Math.min(1,size)});
   }
  }
  splash(position:THREE.Vector3,size=1,color=0xf2fbff){
@@ -71,6 +71,26 @@ export class Effects{
    this.puff(position.clone(),velocity,color,random(.7,1.2),random(.3,.6)*size,random(1,1.9)*size,.85,-9.8);
   }
  }
+ // Sand kicked up where a body scrapes the bottom: it billows, hangs and settles. On the
+ // beach (air) it is dust that drifts up and thins.
+ dust(position:THREE.Vector3,size=1,air=false){
+  for(let i=0;i<5;i++){
+   const velocity=new THREE.Vector3(random(-1,1),random(.15,.9),random(-1,1)).multiplyScalar((air?1.6:1.1)*size);
+   this.puff(position.clone().add(new THREE.Vector3(random(-.5,.5),random(0,.25),random(-.5,.5)).multiplyScalar(size)),velocity,i%2?0xb7a67c:0x8d8468,air?random(1,1.8):random(2.4,4.2),random(.5,.9)*size,random(2,3.4)*size,air?.3:.42,air?-.6:0,!air);
+  }
+ }
+ // A blast: a flash, a fireball and smoke in the air; a white burst of bubbles under water.
+ explosion(position:THREE.Vector3,size=1,underwater=false){
+  if(underwater){
+   for(let i=0;i<16;i++)this.puff(position.clone(),new THREE.Vector3(random(-1,1),random(-.6,1.4),random(-1,1)).multiplyScalar(random(3,9)*size),i%3?0xd9f2f4:0xffffff,random(.9,1.8),random(.5,1)*size,random(2.5,4.5)*size,.6,0,true);
+   return;
+  }
+  this.puff(position.clone(),new THREE.Vector3(),0xfff2c4,.22,size*2,size*6,.95);
+  for(let i=0;i<10;i++)this.puff(position.clone(),new THREE.Vector3(random(-1,1),random(0,1.4),random(-1,1)).multiplyScalar(random(2,6)*size),i%2?0xff8a2a:0xffc24a,random(.35,.7),random(.6,1)*size,random(2,3.2)*size,.9);
+  this.smoke(position,size*1.3);
+ }
+ // One bubble or wisp, for trails behind torpedoes and bullets entering the water.
+ wisp(position:THREE.Vector3,size=1,color=0xe6f6f8){this.puff(position.clone(),new THREE.Vector3(random(-.2,.2),random(.3,.9),random(-.2,.2)),color,random(.7,1.3),.3*size,random(.8,1.3)*size,.5,0,true);}
  smoke(position:THREE.Vector3,size=1){
   for(let i=0;i<10;i++)this.puff(position.clone().add(new THREE.Vector3(random(-1,1),random(0,1),random(-1,1)).multiplyScalar(size)),new THREE.Vector3(random(-.5,.5),random(1.4,3),random(-.5,.5)),i%2?0x2c2c2c:0x4a4744,random(2.2,3.8),random(.8,1.4)*size,random(3,5)*size,.6);
  }
@@ -120,7 +140,8 @@ export class Effects{
  }
  // Break a model apart around an impact point. A limit knocks off only the nearest pieces.
  // With flesh set, the pieces are torn, bloodied body parts that sink trailing blood.
- shatter(model:THREE.Object3D,impact:THREE.Vector3,limit=Infinity,flesh=false){
+ // power scales how hard the pieces are thrown: small things come apart gently.
+ shatter(model:THREE.Object3D,impact:THREE.Vector3,limit=Infinity,flesh=false,power=1){
   model.updateMatrixWorld(true);
   const sources:THREE.Mesh[]=[];model.traverse(node=>{if(node instanceof THREE.Mesh&&!Array.isArray(node.material))sources.push(node);});
   const all=sources.flatMap(source=>this.split(source).map(piece=>({source,piece})));
@@ -134,7 +155,8 @@ export class Effects{
    mesh.position.copy(piece.center).applyMatrix4(source.matrixWorld);mesh.castShadow=true;this.scene.add(mesh);
    const away=mesh.position.clone().sub(impact);if(!flesh)away.y=Math.abs(away.y)*.4;
    const velocity=flesh?away.normalize().multiplyScalar(random(1.5,5)).add(new THREE.Vector3(random(-1.5,1.5),random(-1,2),random(-1.5,1.5))):away.normalize().multiplyScalar(random(2,7)).add(new THREE.Vector3(random(-1.5,1.5),random(2.5,7),random(-1.5,1.5)));
-   this.fragments.push({mesh,velocity,spin:new THREE.Vector3(random(-4,4),random(-4,4),random(-4,4)),life:flesh?random(9,14):random(6,9),scale:mesh.scale.clone(),floats:flesh?Math.random()<.2:Math.random()<.55,wet:mesh.position.y<0,bleed:flesh?random(2.5,5):0,drip:0});
+   velocity.multiplyScalar(power);
+   this.fragments.push({mesh,velocity,spin:new THREE.Vector3(random(-4,4),random(-4,4),random(-4,4)),life:flesh?random(9,14):random(6,9),scale:mesh.scale.clone(),floats:flesh?Math.random()<.2:Math.random()<.55,wet:mesh.position.y<0,bleed:flesh?random(2.5,5):0,drip:0,size:Math.min(1,power)});
   }
  }
  update(dt:number,time:number){
@@ -169,12 +191,12 @@ export class Effects{
     fragment.velocity.y+=(fragment.floats?Math.min(6,(level-mesh.position.y)*9):-1.6)*dt;
     if(fragment.bleed>0){
      fragment.bleed-=dt;fragment.drip-=dt;
-     if(fragment.drip<=0){fragment.drip=.16/this.gore;this.puff(mesh.position.clone(),new THREE.Vector3(random(-.3,.3),random(-.1,.4),random(-.3,.3)),0x560709,random(2,3.5),.25,random(.9,1.7),random(.25,.4),0,true);}
+     if(fragment.drip<=0){fragment.drip=.16/this.gore;this.puff(mesh.position.clone(),new THREE.Vector3(random(-.3,.3),random(-.1,.4),random(-.3,.3)).multiplyScalar(fragment.size),0x560709,random(2,3.5),.25*fragment.size,random(.9,1.7)*fragment.size,random(.25,.4),0,true);}
     }
    }else{fragment.wet=false;fragment.velocity.y-=9.8*dt;}
    mesh.position.addScaledVector(fragment.velocity,dt);
    // Pieces come to rest on the seabed or the sand rather than falling through it.
-   const floor=this.ground(mesh.position.x,mesh.position.z)+.12;
+   const floor=this.ground(mesh.position.x,mesh.position.z)+.12*fragment.size;
    if(mesh.position.y<floor){mesh.position.y=floor;fragment.velocity.set(0,0,0);fragment.spin.set(0,0,0);}
    mesh.rotation.x+=fragment.spin.x*dt;mesh.rotation.y+=fragment.spin.y*dt;mesh.rotation.z+=fragment.spin.z*dt;
    mesh.scale.copy(fragment.scale).multiplyScalar(Math.min(1,fragment.life/1.2));

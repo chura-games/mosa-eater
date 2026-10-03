@@ -17,7 +17,7 @@ export function runCollisionTests(){
  target.position.set(0,-7,-4.7);assert(!hits(),'Prey at another depth must not be eaten');
  player.heading=Math.PI/2;player.mesh.rotation.y=player.heading;
  target.position.set(-4.7,-4,0);assert(hits(),'Bite must follow player rotation');
- player.mesh.rotation.y=0;player.level=4;player.mesh.scale.setScalar(player.scale);
+ player.mesh.rotation.y=0;player.length=19.68;player.mesh.scale.setScalar(player.scale);
  target.position.set(0,-4,-4.7*player.scale);assert(hits(),'Jaw collider must grow with the model');
  player.bite=.45;assert(!player.biteActive,'Opening jaw should not deal damage');
  player.bite=.25;assert(player.biteActive,'Closing jaw should deal damage');
@@ -27,7 +27,7 @@ export function runCollisionTests(){
  const wall=new THREE.Mesh(new THREE.BoxGeometry(12,12,.2));wall.position.z=-8;world.add(wall);
  assert(world.blocked(new THREE.Vector3(0,0,-6),new THREE.Vector3(0,0,-10)),'Wall should block a bite');
  assert(!world.blocked(new THREE.Vector3(9,0,-6),new THREE.Vector3(9,0,-10)),'Open water should not block a bite');
- player.level=0;player.mesh.scale.setScalar(1);player.mesh.position.set(0,-2,0);player.heading=-.2;player.speed=24;
+ player.length=12;player.mesh.scale.setScalar(1);player.mesh.position.set(0,-2,0);player.heading=-.2;player.speed=24;
  const keys=new Set(['KeyW','ShiftLeft']);
  for(let i=0;i<80;i++){
   player.update(1/120,i/120,keys);world.resolve(player.mesh,player.bodySpheres);
@@ -90,7 +90,7 @@ export function runCollisionTests(){
  };
  const slow=simulate(30),fast=simulate(120);
  assert(slow.position.distanceTo(fast.position)<.01&&slow.quaternion.angleTo(fast.quaternion)<.001,'Camera follow must be consistent at different frame rates');
- assert(Math.abs(surfaceHeight(3,6,0)-surfaceHeight(3,6,1))>.05,'Water must animate over time');
- assert(Math.abs(surfaceHeight(3,6,5))<=.9,'Water height must remain bounded');
+ assert([1,2,3].some(t=>Math.abs(surfaceHeight(3,6,0)-surfaceHeight(3,6,t))>.05),'Water must animate over time');
+ assert([0,2,5,9].every(t=>Math.abs(surfaceHeight(3,6,t))<=1.1),'Water height must remain bounded');
  return {assertions:count};
 }

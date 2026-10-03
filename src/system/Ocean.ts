@@ -3,6 +3,8 @@ import {ModelAssets, type AssetName} from './ModelAssets';
 import layout from '../assets/maps/coast.layout.json';
 import {CollisionWorld} from './Collision';
 import {createWater,surfaceHeight} from './Water';
+import {groundHeight} from './Coast';
+import {random} from '../utils/random';
 export function createOcean(scene:THREE.Scene,assets:ModelAssets){
  const map=assets.instantiate('coast');
  const water=map.getObjectByName('Water');
@@ -18,19 +20,21 @@ export function createOcean(scene:THREE.Scene,assets:ModelAssets){
  bubbles.geometry=bubbles.geometry.clone();
  const bubblePositions=bubbles.geometry.attributes.position as THREE.BufferAttribute;
  let bubbleTime=0;
- const update=(time:number,camera:THREE.Camera,player?:Parameters<typeof updateWater>[2],ships?:Parameters<typeof updateWater>[3])=>{
+ const update=(time:number,camera:THREE.Camera,player?:Parameters<typeof updateWater>[2],ships?:Parameters<typeof updateWater>[3],haze=.019)=>{
   const dt=Math.min(.1,Math.max(0,time-bubbleTime));bubbleTime=time;
   // The cloud of bubbles is a 90 m box that wraps around the camera, so it covers any size of map.
   const wrapAround=(value:number,center:number)=>value-Math.round((value-center)/90)*90;
   for(let i=0;i<bubblePositions.count;i++){
    let y=bubblePositions.getY(i)+dt*(.5+(i%5)*.16);
-   if(y>-.4)y=-28;
+   if(y>-.4)y=camera.position.y-random(6,34);
    bubblePositions.setXYZ(i,wrapAround(bubblePositions.getX(i)+Math.sin(time*1.7+i)*dt*.12,camera.position.x),y,wrapAround(bubblePositions.getZ(i),camera.position.z));
   }
-  bubblePositions.needsUpdate=true;updateWater(time,camera,player,ships);
-  // Under water nothing beyond about 125 m shows through the haze, so those sectors are not drawn.
+  bubblePositions.needsUpdate=true;updateWater(time,camera,player,ships,haze);
+  // Under water nothing shows through the haze beyond a certain range (about 125 m for a
+  // 12 m animal), so sectors past it are not drawn.
+  const sight=2.4/haze;
   const submerged=camera.position.y<surfaceHeight(camera.position.x,camera.position.z,time)-.5;
-  for(const sector of sectors){const sphere=sector.boundingSphere!;sector.visible=!submerged||sphere.center.distanceTo(camera.position)<125+sphere.radius;}
+  for(const sector of sectors){const sphere=sector.boundingSphere!;sector.visible=!submerged||sphere.center.distanceTo(camera.position)<sight+sphere.radius;}
  };
  const pointsMaterial=bubbles.material as THREE.PointsMaterial;
  pointsMaterial.size=Number(bubbles.userData.pointSize??.12);
@@ -44,7 +48,8 @@ export function createOcean(scene:THREE.Scene,assets:ModelAssets){
   if(placement.rotation)object.rotation.set(placement.rotation[0],placement.rotation[1],placement.rotation[2]);
   objects.add(object);
  }
- const collisions=new CollisionWorld();collisions.add(map);collisions.add(objects);
+ // Sand and seabed collide through the height formula; only rocks and structures need triangles.
+ const collisions=new CollisionWorld(groundHeight);collisions.add(map);collisions.add(objects);
  // Build collisions from every placed part, then instance only the static render meshes.
  // The source assets and individual collision triangles retain their exact transforms.
  const batches=new Map<string,{mesh:THREE.Mesh,matrices:THREE.Matrix4[]}>();

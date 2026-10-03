@@ -124,6 +124,11 @@ export class Sound{
   for(let i=0;i<Math.round(5+size*4);i++)this.burst(.06+Math.random()*.08,'bandpass',500+Math.random()*2600,300,5,.4,Math.random()*.4);
   if(metal)for(const frequency of [310,467,733])this.tone('triangle',frequency*(.95+Math.random()*.1),frequency*.9,.9,.1,Math.random()*.08);
  }
+ // Gunfire, a heavy gun's report, an explosion, and the predator being hurt.
+ gun(volume=1){if(!this.context)return;this.burst(.07,'bandpass',1900,700,1.2,.34*volume);this.tone('square',150,70,.05,.12*volume);}
+ cannon(volume=1){if(!this.context)return;this.tone('sine',95,30,.7,.8*volume);this.burst(.9,'lowpass',700,90,.7,.6*volume);}
+ boom(size=1){if(!this.context)return;this.tone('sine',70,24,.9,Math.min(1,.7*size));this.burst(1.1,'lowpass',1200,70,.6,Math.min(1,.75*size));for(let i=0;i<5;i++)this.burst(.1,'bandpass',400+Math.random()*1800,200,3,.3,.1+Math.random()*.5);}
+ hurt(){if(!this.context)return;this.tone('sawtooth',130,48,.45,.34);this.burst(.3,'bandpass',900,240,2.2,.5);this.tone('sine',60,34,.5,.5,.03);}
  thud(){if(!this.context)return;this.tone('sine',110,40,.25,.6);this.burst(.2,'bandpass',800,250,3,.4);}
  splash(size=1){if(!this.context)return;this.burst(.5+size*.3,'bandpass',1600,500,.7,.3*Math.min(1.4,size),0,.02);this.burst(.3,'highpass',3000,1800,.5,.14,.03);}
  sonar(){if(!this.context)return;for(let echo=0;echo<4;echo++)this.tone('sine',1180,1150,.7,.3*Math.pow(.42,echo),echo*.38,.004);}

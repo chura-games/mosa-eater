@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 const urls={
  mosasaurus:new URL('../assets/objects/mosasaurus.glb',import.meta.url).href,
  diver:new URL('../assets/objects/diver.glb',import.meta.url).href,
@@ -33,6 +34,13 @@ const urls={
  surfer:new URL('../assets/objects/surfer.glb',import.meta.url).href,
  orca:new URL('../assets/objects/orca.glb',import.meta.url).href,
  whale:new URL('../assets/objects/whale.glb',import.meta.url).href,
+ battleship:new URL('../assets/objects/battleship.glb',import.meta.url).href,
+ ferry:new URL('../assets/objects/ferry.glb',import.meta.url).href,
+ submarine:new URL('../assets/objects/submarine.glb',import.meta.url).href,
+ helicopter:new URL('../assets/objects/helicopter.glb',import.meta.url).href,
+ shrimp:new URL('../assets/objects/shrimp.glb',import.meta.url).href,
+ crab:new URL('../assets/objects/crab.glb',import.meta.url).href,
+ squid:new URL('../assets/objects/squid.glb',import.meta.url).href,
  sky:new URL('../assets/effects/sky.glb',import.meta.url).href,
  bubbles:new URL('../assets/effects/bubbles.glb',import.meta.url).href,
  particle:new URL('../assets/effects/bite-particle.glb',import.meta.url).href,
@@ -49,7 +57,12 @@ export class ModelAssets{
   return new ModelAssets(Object.fromEntries(entries) as Record<AssetName,THREE.Group>);
  }
  // Share immutable geometry; each instance has independent animated transforms.
- instantiate(name:AssetName){return this.models[name].clone(true);}
+ // A skinned model needs its own bones, which a plain clone would keep sharing with the original.
+ instantiate(name:AssetName){
+  const model=this.models[name];let skinned=false;
+  model.traverse(node=>{if(node instanceof THREE.SkinnedMesh)skinned=true;});
+  return skinned?cloneSkinned(model) as THREE.Group:model.clone(true);
+ }
  effect(name:'particle'|'sonar'){
   const node=this.models[name].getObjectByName(name==='particle'?'BiteParticle':'SonarRing');
   if(!(node instanceof THREE.Mesh)||!(node.material instanceof THREE.MeshBasicMaterial))throw new Error('Invalid effect model: '+name);
