@@ -1,17 +1,16 @@
-﻿import * as THREE from 'three';
-import {ellipsoid} from '../utils/geometry';
+import * as THREE from 'three';
 export class Mosasaurus{
- mesh=new THREE.Group(); tail=new THREE.Group();jaw=new THREE.Group();heading=0;energy=100;level=0;speed=0;bite=0;
+ mesh=new THREE.Group(); tail:THREE.Object3D=new THREE.Group();jaw:THREE.Object3D=new THREE.Group();heading=0;energy=100;level=0;speed=0;bite=0;
  constructor(){
- this.mesh.add(ellipsoid(0x315e63,[1.45,1,3.7]),ellipsoid(0x9fae8a,[1.15,.56,3.2],[0,-.5,-.2]),ellipsoid(0x355d5d,[1.05,.62,1.8],[0,.12,-3.7]));
- this.jaw.position.set(0,-.32,-2.6);this.jaw.add(ellipsoid(0x79907a,[.91,.27,1.55],[0,0,-1.1]));this.mesh.add(this.jaw);
- for(let s of [-1,1]){
- this.mesh.add(ellipsoid(0x101b16,[.14,.15,.14],[s*.84,.48,-4.15]),ellipsoid(0xd6da94,[.08,.08,.08],[s*.93,.5,-4.18]));
- for(let z of [-1.4,2]){const fin=ellipsoid(0x2a5257,[2,.16,.64],[s*1.9,-.5,z]);fin.rotation.y=s*.42;this.mesh.add(fin);}
- for(let i=0;i<8;i++){const tooth=new THREE.Mesh(new THREE.ConeGeometry(.1,.35,4),new THREE.MeshStandardMaterial({color:0xe4e6c9}));tooth.position.set(s*.7,-.18,-3-i*.29);tooth.rotation.z=Math.PI;this.mesh.add(tooth);}
- }
- this.tail.position.z=2.8;this.tail.add(ellipsoid(0x315c60,[.7,.65,2.7],[0,0,1.8]),ellipsoid(0x315c60,[.2,1.9,1.1],[0,.5,4]));this.mesh.add(this.tail);
  this.mesh.position.set(0,-4,18);
+ }
+ static fromModel(model:THREE.Object3D){
+ const tail=model.getObjectByName('Tail'),jaw=model.getObjectByName('Jaw');
+ if(!tail||!jaw)throw new Error('Mosasaurus model requires Tail and Jaw nodes');
+ const player=new Mosasaurus();
+ player.tail=tail;player.jaw=jaw;
+ player.mesh.add(model);
+ return player;
  }
  get scale(){return 1+this.level*.16}
  update(dt:number,time:number,keys:Set<string>){

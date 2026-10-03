@@ -1,8 +1,10 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import './style.css';
 import {Mosasaurus} from './entities/Mosasaurus';
 import {Human} from './entities/Human';
 import {createOcean} from './system/Ocean';
+import {ModelAssets} from './system/ModelAssets';
+async function initialize(){
 const $=(id:string)=>document.getElementById(id)!;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x83bac0);scene.fog=new THREE.FogExp2(0x75aeb5,.007);
 const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,700);
@@ -10,8 +12,25 @@ let renderer:THREE.WebGLRenderer;
 try{renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});}catch{$('start').textContent='WebGLを利用できません';throw new Error('WebGL unavailable');}
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;$('world').appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xd5f4ed,0x25465b,2));const sun=new THREE.DirectionalLight(0xffefcf,3);sun.position.set(-60,90,30);scene.add(sun);
-const ocean=createOcean(scene);const player=new Mosasaurus();scene.add(player.mesh);
-const prey:Human[]=[];for(let i=0;i<34;i++){const p=new Human(i<20?'diver':i<28?'shark':'boat');prey.push(p);scene.add(p.mesh);}
+async function loadAssets(){
+ const start=$('start') as HTMLButtonElement;
+ start.disabled=true;start.textContent='海を準備中…';
+ try{
+ const assets=await ModelAssets.load();
+ const player=Mosasaurus.fromModel(assets.instantiate('mosasaurus'));
+ const ocean=createOcean(scene,assets);
+ const sonarRing=assets.effect('sonar');
+ const particle=assets.effect('particle');particle.material.dispose();
+ start.disabled=false;start.innerHTML='狩りを始める <span>→</span>';
+ return {assets,player,ocean,sonarRing};
+ }catch(error){
+ start.textContent='モデル読み込み失敗：ページを再読み込み';
+ console.error('Failed to load game assets',error);
+ throw error;
+ }
+}
+const {assets,player,ocean,sonarRing}=await loadAssets();scene.add(player.mesh);
+const prey:Human[]=[];for(let i=0;i<34;i++){const kind=i<20?'diver':i<28?'shark':'boat';const p=new Human(kind,assets.instantiate(kind));prey.push(p);scene.add(p.mesh);}
 // A nearby first hunt makes the controls easy to learn.
 prey[0].mesh.position.set(0,-4,4);prey[1].mesh.position.set(7,-4,-8);
 const keys=new Set<string>();let running=false,paused=false,bio=0,panic=0,eaten=0,patrolSpawned=false,sonar=0,cooldown=0,toastTimer=0,shake=0,time=0,sound=false,audio:AudioContext|undefined;
@@ -22,7 +41,7 @@ function eat(){
  const mouth=player.mouth();let hit=false;
  for(const p of prey){if(!p.alive||p.mesh.position.distanceTo(mouth)>5.5*player.scale)continue;
  p.alive=false;p.mesh.visible=false;p.respawn=18;bio+=p.points;eaten++;panic=Math.min(100,panic+(p.kind==='diver'?9:15));hit=true;shake=.35;toast(p.label+' +'+p.points+' BP');tone(170,.25);
- for(let i=0;i<12;i++){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(.2,0),new THREE.MeshBasicMaterial({color:0xd2f4cb,transparent:true,opacity:.9}));m.position.copy(p.mesh.position);scene.add(m);particles.push({mesh:m,velocity:new THREE.Vector3((Math.random()-.5)*12,Math.random()*8,(Math.random()-.5)*12),life:1});}
+ for(let i=0;i<12;i++){const m=assets.effect('particle');m.position.copy(p.mesh.position);scene.add(m);particles.push({mesh:m,velocity:new THREE.Vector3((Math.random()-.5)*12,Math.random()*8,(Math.random()-.5)*12),life:1});}
  }
  if(!hit)toast('獲物に接近して噛みつこう');
 }
@@ -36,7 +55,7 @@ addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>{ke
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 const radar=($('radar') as HTMLCanvasElement).getContext('2d')!;
 const particles:{mesh:THREE.Mesh,velocity:THREE.Vector3,life:number}[]=[];
-const sonarRing=new THREE.Mesh(new THREE.RingGeometry(.98,1,80),new THREE.MeshBasicMaterial({color:0xc3f865,transparent:true,opacity:.7,side:THREE.DoubleSide}));sonarRing.rotation.x=-Math.PI/2;scene.add(sonarRing);
+scene.add(sonarRing);
 function hud(){
  $('bio').textContent=String(bio);$('length').textContent=(12*player.scale).toFixed(1);
  $('boostValue').textContent=Math.round(player.energy)+'%';$('boostBar').style.width=player.energy+'%';$('panicValue').textContent=Math.round(panic)+'%';$('panicBar').style.width=panic+'%';
@@ -58,7 +77,7 @@ function loop(now:number){
  const boost=player.update(dt,time,keys);camera.fov=THREE.MathUtils.damp(camera.fov,boost?72:62,3,dt);camera.updateProjectionMatrix();
  cooldown=Math.max(0,cooldown-dt);sonar=Math.max(0,sonar-dt);panic=Math.max(0,panic-dt*.45);toastTimer-=dt;if(toastTimer<=0)$('toast').textContent='';
  for(const p of prey)p.update(dt,time,player.mesh.position,panic);
- if(panic>=50&&!patrolSpawned){patrolSpawned=true;for(let i=0;i<4;i++){const p=new Human('patrol');p.mesh.position.set(-40+i*22,0,-80);scene.add(p.mesh);prey.push(p);}toast('警戒レベル上昇 — 迎撃艇出動');}
+ if(panic>=50&&!patrolSpawned){patrolSpawned=true;for(let i=0;i<4;i++){const p=new Human('patrol',assets.instantiate('patrol'));p.mesh.position.set(-40+i*22,0,-80);scene.add(p.mesh);prey.push(p);}toast('警戒レベル上昇 — 迎撃艇出動');}
  for(const p of prey){if(p.kind==='patrol'&&p.alive&&p.mesh.position.distanceTo(player.mesh.position)<8){player.energy=Math.max(0,player.energy-dt*12);}}
  }
  else{player.tail.rotation.y=Math.sin(time*3)*.22;player.mesh.rotation.y=-.5;}
@@ -67,9 +86,11 @@ function loop(now:number){
  shake=Math.max(0,shake-dt);if(shake>0)camera.position.add(new THREE.Vector3((Math.random()-.5)*shake,(Math.random()-.5)*shake,0));camera.lookAt(look);
  const underwater=camera.position.y<0;scene.fog!.color.set(underwater?0x17515e:0x75aeb5);(scene.fog as THREE.FogExp2).density=underwater?.023:.007;scene.background=new THREE.Color(underwater?0x17515e:0x83bac0);
  sonarRing.visible=sonar>0;sonarRing.position.copy(player.mesh.position);sonarRing.scale.setScalar((3-sonar)*35+1);(sonarRing.material as THREE.MeshBasicMaterial).opacity=sonar/4;
- for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;p.mesh.position.addScaledVector(p.velocity,dt);(p.mesh.material as THREE.MeshBasicMaterial).opacity=Math.max(0,p.life);if(p.life<=0){scene.remove(p.mesh);p.mesh.geometry.dispose();(p.mesh.material as THREE.Material).dispose();particles.splice(i,1);}}
+ for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.life-=dt;p.mesh.position.addScaledVector(p.velocity,dt);(p.mesh.material as THREE.MeshBasicMaterial).opacity=Math.max(0,p.life);if(p.life<=0){scene.remove(p.mesh);(p.mesh.material as THREE.Material).dispose();particles.splice(i,1);}}
  hud();
  }
  renderer.render(scene,camera);
 }
 camera.position.set(14,9,39);camera.lookAt(player.mesh.position);requestAnimationFrame(loop);
+}
+void initialize().catch(()=>{});
