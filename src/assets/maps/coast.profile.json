@@ -1,0 +1,12 @@
+{
+  "shoreZ": -28,
+  "curveAmplitude": 5,
+  "curveFrequency": 0.035,
+  "seaSlope": 0.34,
+  "beachSlope": 0.12,
+  "floorDepth": 30,
+  "mapHalfWidth": 160,
+  "playHalfWidth": 78,
+  "playMinZ": -52,
+  "playMaxZ": 76
+}

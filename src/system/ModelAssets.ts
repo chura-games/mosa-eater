@@ -12,6 +12,26 @@ const urls={
  umbrella:new URL('../assets/objects/umbrella.glb',import.meta.url).href,
  umbrellaOrange:new URL('../assets/objects/umbrella-orange.glb',import.meta.url).href,
  platform:new URL('../assets/objects/platform.glb',import.meta.url).href,
+ lounger:new URL('../assets/objects/lounger.glb',import.meta.url).href,
+ pier:new URL('../assets/objects/pier.glb',import.meta.url).href,
+ beachBar:new URL('../assets/objects/beach-bar.glb',import.meta.url).href,
+ grass:new URL('../assets/objects/grass.glb',import.meta.url).href,
+ coral:new URL('../assets/objects/coral.glb',import.meta.url).href,
+ fish:new URL('../assets/objects/fish.glb',import.meta.url).href,
+ dolphin:new URL('../assets/objects/dolphin.glb',import.meta.url).href,
+ turtle:new URL('../assets/objects/turtle.glb',import.meta.url).href,
+ swimmer:new URL('../assets/objects/swimmer.glb',import.meta.url).href,
+ jetski:new URL('../assets/objects/jetski.glb',import.meta.url).href,
+ sailboat:new URL('../assets/objects/sailboat.glb',import.meta.url).href,
+ buoy:new URL('../assets/objects/buoy.glb',import.meta.url).href,
+ gull:new URL('../assets/objects/gull.glb',import.meta.url).href,
+ kelp:new URL('../assets/objects/kelp.glb',import.meta.url).href,
+ ray:new URL('../assets/objects/ray.glb',import.meta.url).href,
+ seal:new URL('../assets/objects/seal.glb',import.meta.url).href,
+ jellyfish:new URL('../assets/objects/jellyfish.glb',import.meta.url).href,
+ kayak:new URL('../assets/objects/kayak.glb',import.meta.url).href,
+ surfer:new URL('../assets/objects/surfer.glb',import.meta.url).href,
+ sky:new URL('../assets/effects/sky.glb',import.meta.url).href,
  bubbles:new URL('../assets/effects/bubbles.glb',import.meta.url).href,
  particle:new URL('../assets/effects/bite-particle.glb',import.meta.url).href,
  sonar:new URL('../assets/effects/sonar-ring.glb',import.meta.url).href,
@@ -19,10 +39,10 @@ const urls={
 export type AssetName=keyof typeof urls;
 export class ModelAssets{
  private constructor(private models:Record<AssetName,THREE.Group>){}
- static async load(){
-  const loader=new GLTFLoader();
+ static async load(onProgress?:(loaded:number,total:number)=>void){
+  const loader=new GLTFLoader(),total=Object.keys(urls).length;let loaded=0;
   const entries=await Promise.all(Object.entries(urls).map(async([name,url])=>{
-   const gltf=await loader.loadAsync(url);return [name,gltf.scene] as const;
+   const gltf=await loader.loadAsync(url);onProgress?.(++loaded,total);return [name,gltf.scene] as const;
   }));
   return new ModelAssets(Object.fromEntries(entries) as Record<AssetName,THREE.Group>);
  }

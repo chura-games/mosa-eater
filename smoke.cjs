@@ -1,9 +1,9 @@
-﻿const {chromium}=require('@playwright/test');
+const {chromium}=require('@playwright/test');
 (async()=>{
  const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--enable-unsafe-swiftshader']});
  const page=await browser.newPage({viewport:{width:1440,height:900}});
- const errors=[];page.on('pageerror',e=>errors.push(e.message));
- const names=['mosasaurus','diver','shark','boat','patrol','coast','rock','palm','umbrella','umbrella-orange','platform','bubbles','bite-particle','sonar-ring'];
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',message=>{if(message.type()==='error'&&/shader|VALIDATE_STATUS|GL_INVALID/i.test(message.text()))errors.push(message.text());});
+ const names=['mosasaurus','diver','shark','boat','patrol','coast','rock','palm','umbrella','umbrella-orange','platform','lounger','pier','beach-bar','grass','coral','kelp','fish','dolphin','turtle','swimmer','jetski','sailboat','buoy','gull','ray','seal','jellyfish','kayak','surfer','sky','bubbles','bite-particle','sonar-ring'];
  const modelResponses=names.map(name=>page.waitForResponse(response=>new URL(response.url()).pathname.endsWith('/'+name+'.glb')));
  await page.goto('http://127.0.0.1:5173');await page.waitForSelector('#world canvas');await page.screenshot({path:'preview-title.png'});
  const models=await Promise.all(modelResponses);let modelBytes=0;
@@ -15,17 +15,37 @@
    for(const nodeName of ['Water','Seabed','Beach','SandDune']){
     if(!json.nodes.some(node=>node.name===nodeName))throw Error('Missing map node: '+nodeName);
    }
-   if(json.nodes.some(node=>/Platform|Palm|Rock|Umbrella|Bubbles/.test(node.name??'')))throw Error('Map contains prop models');
+   if(json.nodes.some(node=>/Platform|Palm|Rock|Umbrella|Bubbles|Kelp/.test(node.name??'')))throw Error('Map contains prop models');
   }
   modelBytes+=bytes.length;
  }
- await page.click('#start');await page.keyboard.down('KeyW');await page.waitForTimeout(1100);await page.keyboard.up('KeyW');await page.keyboard.press('Space');await page.waitForTimeout(150);
+ const collisionTests=await page.evaluate(async()=>{
+  const tests=await import('/src/system/Collision.test.ts');return tests.runCollisionTests();
+ });
+ console.log('Collision tests: '+JSON.stringify(collisionTests));
+ console.log('Coast tests: '+JSON.stringify(await page.evaluate(async()=>{
+  const tests=await import('/src/system/Coast.test.ts');return tests.runCoastTests();
+ })));
+ await page.waitForFunction(()=>!document.querySelector('#start').disabled);
+ await page.waitForSelector('#loading',{state:'hidden',timeout:30000});
+ await page.keyboard.down('KeyW');
+ await page.waitForFunction(()=>Number(document.querySelector('#bio').textContent)>=25,{},{timeout:20000});
+ await page.keyboard.up('KeyW');
+ if(!await page.evaluate(()=>document.pointerLockElement===document.querySelector('#world canvas')))throw Error('Mouse look was not captured');
  const bio=await page.locator('#bio').textContent();if(Number(bio)<25)throw Error('First bite did not capture nearby prey: '+bio);
- await page.keyboard.press('KeyF');await page.keyboard.press('Escape');if(!await page.locator('#paused').isVisible())throw Error('Pause failed');
- await page.click('#resume');await page.keyboard.down('KeyQ');await page.waitForTimeout(600);await page.keyboard.up('KeyQ');
+ await page.keyboard.press('Escape');if(!await page.locator('#paused').isVisible())throw Error('Pause failed');
+ await page.click('#resume');
+ const depthBefore=Number((await page.locator('#depth').textContent()).match(/\d+/)[0]);
+ await page.evaluate(()=>document.dispatchEvent(new MouseEvent('mousemove',{movementY:200})));
+ // Headless rendering runs slower than real time, so wait for the dive rather than a fixed delay.
+ await page.keyboard.down('KeyW');
+ await page.waitForFunction(before=>Number(document.querySelector('#depth').textContent.match(/\d+/)[0])>before,depthBefore,{timeout:6000}).catch(()=>{throw Error('Mouse look + W did not dive');});
+ await page.keyboard.up('KeyW');
  await page.screenshot({path:'preview-game.png'});
+ await page.keyboard.down('KeyR');await page.waitForTimeout(1300);await page.keyboard.up('KeyR');
+ await page.screenshot({path:'preview-surface.png'});
  if(errors.length)throw Error(errors.join('\n'));
- console.log(JSON.stringify({webgl:true,loadedModels:names.length,modelBytes,firstCaptureBP:bio,pauseResume:true,sonar:true,depth:await page.locator('#depth').textContent(),runtimeErrors:errors}));
+ console.log(JSON.stringify({webgl:true,loadedModels:names.length,modelBytes,automaticCapture:true,firstCaptureBP:bio,pauseResume:true,depth:await page.locator('#depth').textContent(),runtimeErrors:errors}));
  const failedPage=await browser.newPage();
  await failedPage.route('**/maps/coast*.glb',route=>route.abort());
  await failedPage.goto('http://127.0.0.1:5173');
