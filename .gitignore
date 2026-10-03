@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Blender
+*.blend1
+*.blend2
+*.blend@
+__pycache__/
